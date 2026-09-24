@@ -91,9 +91,15 @@ bash scripts/package-macos.sh aarch64-apple-darwin
 # iscc installer/windows/nebulya-setup.iss /DBinaryDir=target\x86_64-pc-windows-msvc\release
 ```
 
-GitHub Actions가 `main` 푸시 / `v*` 태그마다 3OS 빌드+패키징을 자동 수행하고,
-태그 푸시 시 Release에 설치 파일을 첨부합니다.
-아티팩트는 용량 절약을 위해 설치 파일만, 1일 보관입니다.
+GitHub Actions가 `main` 푸시 / `v*` 태그마다 3OS 빌드+패키징을 자동 수행합니다.
+일반 푸시는 컴파일+패키징 검증만 하고, 설치 파일 다운로드는 태그 푸시 시
+생성되는 Release에서 받으세요 (아티팩트 무료 할당량 절약 목적).
+
+```bash
+git tag v0.3.1 && git push origin v0.3.1
+```
+
+아티팩트는 설치 파일만, 1일 보관입니다.
 
 > Artifact quota 초과 에러가 나면: Actions 실행 페이지에서 오래된 아티팩트를
 > 지우고 6~12시간 뒤 사용량이 재계산될 때까지 기다리세요.

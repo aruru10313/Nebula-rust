@@ -94,5 +94,9 @@ jobs:
           gh release view "$TAG" >/dev/null 2>&1 \
             || gh release create "$TAG" --generate-notes --title "$TAG" \
             || true
-          gh release upload "$TAG" dist/**/* --clobber
+          # 파일만 첨부 (staging 디렉토리 제외)
+          shopt -s nullglob globstar
+          files=(dist/**/*.tar.gz dist/**/*.deb dist/**/*.dmg dist/**/*.exe)
+          echo "uploading: ${files[@]}"
+          gh release upload "$TAG" "${files[@]}" --clobber
           echo "==> attached to release $TAG"

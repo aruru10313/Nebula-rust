@@ -63,7 +63,6 @@ assets = [
   ["target/release/nebulya-launcher", "usr/bin/", "755"],
   ["README.md", "usr/share/doc/nebulya-launcher/", "644"],
 ]
-description = "Nebulya Launcher - Rust 기반 Fabric Minecraft 런처"
 extended-description = """\
 Lunar / Dawn 스타일의 Rust 네이티브 Fabric 런처.
 Modrinth + CurseForge(Fabric) 모드 관리, Discord Activity 지원.\

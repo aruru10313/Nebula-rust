@@ -14,6 +14,9 @@ jobs:
   build:
     name: Build + Package (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # Release 첨부용 쓰기 권한 (태그 푸시 때만 사용)
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -21,15 +24,12 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: .exe
-            artifact: nebulya-launcher-windows
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             ext: ""
-            artifact: nebulya-launcher-linux
           - os: macos-latest
             target: aarch64-apple-darwin
             ext: ""
-            artifact: nebulya-launcher-macos-arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -53,14 +53,6 @@ jobs:
 
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Rename binary
-        shell: bash
-        run: |
-          SRC="target/${{ matrix.target }}/release/nebulya-launcher${{ matrix.ext }}"
-          DST="nebulya-launcher-${{ matrix.target }}${{ matrix.ext }}"
-          cp "$SRC" "$DST"
-          ls -lh "$DST"
 
       # ---------- OS별 설치 파일 ----------
       - name: Install cargo-deb (Linux)
@@ -87,35 +79,20 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist/windows
-          cp "nebulya-launcher-${{ matrix.target }}.exe" dist/windows/
-          cp dist/*.exe dist/windows/ 2>/dev/null || true
+          cp "target/${{ matrix.target }}/release/nebulya-launcher${{ matrix.ext }}" dist/windows/
           ls -lh dist/windows
 
-      # 설치 파일만 업로드 (용량 절약) + 1일 보관 (무료 할당량 초과 방지)
-      # 일반 푸시에서는 업로드 생략(컴파일+패키징 검증만) → 태그(v*)에서만 Release 첨부
-      - name: Upload artifact
+      # ---------- Release에 직접 첨부 (아티팩트 미사용 → 할당량 소모 없음) ----------
+      # 일반 푸시에서는 여기까지만 (컴파일+패키징 검증). 태그 푸시에서만 파일 첨부.
+      - name: Attach to GitHub Release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          retention-days: 1
-          compression-level: 9
-          path: dist/**/*
-
-  release:
-    name: Release
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/**/*
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --generate-notes --title "$TAG" \
+            || true
+          gh release upload "$TAG" dist/**/* --clobber
+          echo "==> attached to release $TAG"

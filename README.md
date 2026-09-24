@@ -92,17 +92,12 @@ bash scripts/package-macos.sh aarch64-apple-darwin
 ```
 
 GitHub Actions가 `main` 푸시 / `v*` 태그마다 3OS 빌드+패키징을 자동 수행합니다.
-일반 푸시는 컴파일+패키징 검증만 하고, 설치 파일 다운로드는 태그 푸시 시
-생성되는 Release에서 받으세요 (아티팩트 무료 할당량 절약 목적).
+일반 푸시는 컴파일+패키징 검증만 하고, 설치 파일은 태그 푸시 시 생성되는
+Release에 **직접 첨부**됩니다 (Actions 아티팩트를 거치지 않아 할당량 소모 없음).
 
 ```bash
-git tag v0.3.1 && git push origin v0.3.1
+git tag v0.3.0 && git push origin v0.3.0
 ```
-
-아티팩트는 설치 파일만, 1일 보관입니다.
-
-> Artifact quota 초과 에러가 나면: Actions 실행 페이지에서 오래된 아티팩트를
-> 지우고 6~12시간 뒤 사용량이 재계산될 때까지 기다리세요.
 
 ## 로드맵
 

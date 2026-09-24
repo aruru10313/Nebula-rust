@@ -94,9 +94,9 @@ jobs:
           gh release view "$TAG" >/dev/null 2>&1 \
             || gh release create "$TAG" --generate-notes --title "$TAG" \
             || true
-          # 파일만 첨부 (staging 디렉토리 제외)
-          shopt -s nullglob globstar
-          files=(dist/**/*.tar.gz dist/**/*.deb dist/**/*.dmg dist/**/*.exe)
-          echo "uploading: ${files[@]}"
-          gh release upload "$TAG" "${files[@]}" --clobber
+          # 파일만 첨부 (staging 디렉토리 제외, bash 3.2/macOS 호환)
+          files=$(find dist -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.dmg' -o -name '*.exe' \))
+          echo "uploading: $files"
+          # shellcheck disable=SC2086
+          gh release upload "$TAG" $files --clobber
           echo "==> attached to release $TAG"

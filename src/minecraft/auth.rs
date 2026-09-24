@@ -46,8 +46,9 @@ impl MinecraftSession {
 }
 
 /// 로그인 진행 상태 (백그라운드 스레드 → UI 전달용)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum LoginState {
+    #[default]
     Idle,
     /// 브라우저에서 코드 입력 대기
     Code { user_code: String, uri: String },
@@ -56,12 +57,6 @@ pub enum LoginState {
     /// 완료 (UI가 config에 반영 후 Idle로)
     Done(StoredAccount),
     Failed(String),
-}
-
-impl Default for LoginState {
-    fn default() -> Self {
-        LoginState::Idle
-    }
 }
 
 /// 저장된 정품 계정 (config.json)

@@ -26,7 +26,7 @@ impl Tab {
         match self {
             Tab::Home => "▶",
             Tab::Instances => "▦",
-            Tab::Mods => "◈",
+            Tab::Mods => "◆",
             Tab::Settings => "⚙",
         }
     }
@@ -57,6 +57,7 @@ pub struct NebulyaApp {
 impl NebulyaApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         crate::ui::theme::apply_theme(&cc.egui_ctx);
+        crate::ui::fonts::install_korean_fonts(&cc.egui_ctx);
         let config = LauncherConfig::load();
         let instances = instance::load_instances(&config.game_root);
 
@@ -81,7 +82,7 @@ impl NebulyaApp {
             status: "준비됨".to_string(),
             progress: None,
             launching: false,
-            logs: vec!["✦ Nebulya Launcher v0.3 stellar 초기화".to_string()],
+            logs: vec!["★ Nebulya Launcher v0.3 stellar 초기화".to_string()],
             new_instance_name: "새 인스턴스".to_string(),
             new_mc_version: "1.20.1".to_string(),
             new_loader_version: "0.16.9".to_string(),
@@ -223,7 +224,7 @@ impl NebulyaApp {
                 self.config.username = acc.username.clone();
                 self.config.account = Some(acc.clone());
                 self.persist();
-                self.status = format!("✦ {}님, 정품 로그인 완료", acc.username);
+                self.status = format!("★ {}님, 정품 로그인 완료", acc.username);
                 self.log(format!("정품 로그인: {} ({})", acc.username, acc.uuid));
                 *self.login_state.lock().unwrap() = LoginState::Idle;
             }
@@ -405,7 +406,7 @@ impl eframe::App for NebulyaApp {
                 // 로고
                 ui.vertical_centered(|ui| {
                     ui.label(
-                        egui::RichText::new("✦")
+                        egui::RichText::new("★")
                             .size(34.0)
                             .color(crate::ui::theme::NEBULA_LIGHT),
                     );
@@ -461,7 +462,7 @@ impl eframe::App for NebulyaApp {
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
                     ui.add_space(12.0);
                     ui.vertical_centered(|ui| {
-                        crate::ui::theme::badge(ui, "✦ v0.3.0 stellar", crate::ui::theme::NEBULA_LIGHT);
+                        crate::ui::theme::badge(ui, "★ v0.3.0 stellar", crate::ui::theme::NEBULA_LIGHT);
                     });
                     ui.add_space(6.0);
                     // 유저 카드
@@ -478,20 +479,25 @@ impl eframe::App for NebulyaApp {
                                         .size(13.0)
                                         .strong(),
                                 );
-                                let (dot, txt) = if !self.config.discord_enabled
+                                let (dot, dot_color, txt) = if !self.config.discord_enabled
                                     || self.config.discord_client_id.trim().is_empty()
                                 {
-                                    ("⚪", "Discord 꺼짐")
+                                    ("○", crate::ui::theme::TEXT_FAINT, "Discord 꺼짐")
                                 } else if self.discord.is_connected() {
-                                    ("🟢", "활동 표시 중")
+                                    ("●", crate::ui::theme::SUCCESS, "활동 표시 중")
                                 } else {
-                                    ("🟡", "연결 대기 중")
+                                    ("●", crate::ui::theme::WARN, "연결 대기 중")
                                 };
-                                ui.label(
-                                    egui::RichText::new(format!("{dot} {txt}"))
-                                        .size(11.0)
-                                        .color(crate::ui::theme::TEXT_DIM),
-                                );
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        egui::RichText::new(dot).size(11.0).color(dot_color),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(txt)
+                                            .size(11.0)
+                                            .color(crate::ui::theme::TEXT_DIM),
+                                    );
+                                });
                             });
                         });
                     });
@@ -514,7 +520,7 @@ impl eframe::App for NebulyaApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(
-                        egui::RichText::new("◈  INSTANCE")
+                        egui::RichText::new("◆  INSTANCE")
                             .size(11.0)
                             .color(crate::ui::theme::TEXT_FAINT),
                     );
@@ -527,7 +533,7 @@ impl eframe::App for NebulyaApp {
                     egui::ComboBox::from_id_salt("instance_select")
                         .selected_text(
                             self.selected_instance()
-                                .map(|i| format!("✦ {}  ·  {}", i.name, i.display_version()))
+                                .map(|i| format!("★ {}  ·  {}", i.name, i.display_version()))
                                 .unwrap_or_else(|| "없음".into()),
                         )
                         .show_ui(ui, |ui| {
@@ -535,7 +541,7 @@ impl eframe::App for NebulyaApp {
                                 ui.selectable_value(
                                     &mut selected_id,
                                     inst.id.clone(),
-                                    format!("✦ {}  ·  {}", inst.name, inst.display_version()),
+                                    format!("★ {}  ·  {}", inst.name, inst.display_version()),
                                 );
                             }
                         });
@@ -544,7 +550,7 @@ impl eframe::App for NebulyaApp {
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let btn_label = if self.launching {
-                            "✦  실행 중..."
+                            "★  실행 중..."
                         } else {
                             "▶  플레이"
                         };
@@ -579,7 +585,7 @@ impl eframe::App for NebulyaApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(
-                        egui::RichText::new("✦").color(crate::ui::theme::NEBULA_LIGHT).size(12.0),
+                        egui::RichText::new("★").color(crate::ui::theme::NEBULA_LIGHT).size(12.0),
                     );
                     ui.label(
                         egui::RichText::new(&self.status)

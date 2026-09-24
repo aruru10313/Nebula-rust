@@ -16,7 +16,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(
-                    egui::RichText::new("✦ STELLAR FABRIC")
+                    egui::RichText::new("★ STELLAR FABRIC")
                         .size(11.0)
                         .color(theme::NEBULA_LIGHT),
                 );
@@ -32,7 +32,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 if let Some(inst) = app.selected_instance().cloned() {
                     ui.horizontal(|ui| {
                         ui.label(
-                            egui::RichText::new(format!("◈ {}", inst.name))
+                            egui::RichText::new(format!("◆ {}", inst.name))
                                 .size(14.0)
                                 .color(theme::STARLIGHT),
                         );
@@ -40,7 +40,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     });
                     ui.label(
                         egui::RichText::new(format!(
-                            "✦ {}회 항해{}",
+                            "★ {}회 항해{}",
                             inst.total_plays,
                             inst.last_played
                                 .map(|t| format!(" · 마지막: {}", t.format("%m/%d %H:%M")))
@@ -93,7 +93,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     };
     ui.horizontal(|ui| {
         theme::stat_tile(ui, "🚀", &plays, "항해 횟수", theme::NEBULA_LIGHT);
-        theme::stat_tile(ui, "◈", &mods_count, "탑재 모드", theme::STAR_PINK);
+        theme::stat_tile(ui, "◆", &mods_count, "탑재 모드", theme::STAR_PINK);
         theme::stat_tile(
             ui,
             "☕",
@@ -109,7 +109,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     // ---- 항해일지 (로그) ----
     theme::glow_card_frame().show(ui, |ui| {
         ui.horizontal(|ui| {
-            theme::section_header(ui, "✎", "항해일지", "최근 로그");
+            theme::section_header(ui, "≡", "항해일지", "최근 로그");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if theme::ghost_button(ui, "지우기").clicked() {
                     app.logs.clear();

@@ -42,6 +42,7 @@ urlencoding = "2"
 discord-rich-presence = "1"
 
 [dev-dependencies]
+ab_glyph = "0.2"
 
 [profile.release]
 opt-level = 3
@@ -62,6 +63,7 @@ priority = "optional"
 assets = [
   ["target/release/nebulya-launcher", "usr/bin/", "755"],
   ["README.md", "usr/share/doc/nebulya-launcher/", "644"],
+  ["assets/nebulya-launcher.desktop", "usr/share/applications/", "644"],
 ]
 extended-description = """\
 Lunar / Dawn 스타일의 Rust 네이티브 Fabric 런처.

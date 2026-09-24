@@ -13,7 +13,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         if let Some(acc) = app.config.account.clone() {
             ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new(format!("✦ {}", acc.username))
+                    egui::RichText::new(format!("★ {}", acc.username))
                         .size(16.0)
                         .strong(),
                 );
@@ -73,7 +73,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             let login_snapshot = app.login_state.lock().unwrap().clone();
             match login_snapshot {
                 LoginState::Idle => {
-                    if theme::accent_button(ui, "✦ Microsoft 로그인").clicked() {
+                    if theme::accent_button(ui, "★ Microsoft 로그인").clicked() {
                         app.start_ms_login();
                     }
                 }
@@ -161,7 +161,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(8.0);
 
     crate::ui::theme::card_frame().show(ui, |ui| {
-        theme::section_header(ui, "◈", "모드 제공자", "");
+        theme::section_header(ui, "◆", "모드 제공자", "");
         ui.label(
             egui::RichText::new("Modrinth는 키 없이 사용 가능. CurseForge는 API 키가 필요합니다.")
                 .color(crate::ui::theme::TEXT_DIM)
@@ -181,7 +181,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(8.0);
 
     crate::ui::theme::card_frame().show(ui, |ui| {
-        theme::section_header(ui, "✦", "Discord Activity", "");
+        theme::section_header(ui, "★", "Discord Activity", "");
         ui.horizontal(|ui| {
             ui.checkbox(&mut app.config.discord_enabled, "디스코드에 상태 표시");
             let (dot, txt) = if !app.config.discord_enabled
@@ -189,9 +189,9 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             {
                 ("⚪", "꺼짐")
             } else if app.discord.is_connected() {
-                ("🟢", "활동 표시 중")
+                ("●", "활동 표시 중")
             } else {
-                ("🟡", "연결 대기 중 — 디스코드를 켜고 다시 연결을 눌러보세요")
+                ("●", "연결 대기 중 — 디스코드를 켜고 다시 연결을 눌러보세요")
             };
             theme::badge(
                 ui,

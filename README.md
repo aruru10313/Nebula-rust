@@ -9,6 +9,7 @@ Rust 네이티브 마인크래프트 **Fabric 전용** 런처입니다.
 - **Modrinth + CurseForge (Fabric 강제 필터)** 검색·설치·활성화/삭제
 - **Discord Activity** (대기/검색/플레이/설정 + 경과 시간 + GitHub 버튼)
 - Java 자동탐지 + RAM/해상도 설정 + 인스턴스(프로필) 관리
+- 한글 번들 폰트 (NotoSansKR 서브셋, tofu 방지 + 커버리지 테스트)
 - Win/Linux/macOS 설치 파일 자동 생성 (Setup exe / .deb+tar.gz / .dmg+tar.gz)
 
 저장소: https://github.com/aruru10313/Nebula-rust

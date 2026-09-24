@@ -260,7 +260,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     use crate::ui::theme;
     ui.add_space(10.0);
     ui.horizontal(|ui| {
-        theme::section_header(ui, "◈", "모드", "Modrinth · CurseForge");
+        theme::section_header(ui, "◆", "모드", "Modrinth · CurseForge");
         theme::badge(ui, "Fabric 전용", theme::NEBULA_LIGHT);
     });
     let mc = app
@@ -427,7 +427,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     // 설치된 모드
     crate::ui::theme::card_frame().show(ui, |ui| {
         ui.horizontal(|ui| {
-            theme::section_header(ui, "✦", "설치된 모드", "클릭으로 켜기/끄기");
+            theme::section_header(ui, "★", "설치된 모드", "클릭으로 켜기/끄기");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if theme::ghost_button(ui, "📂 폴더 열기").clicked() {
                     if let Some(inst) = app.selected_instance() {

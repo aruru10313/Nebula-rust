@@ -82,7 +82,7 @@ impl DiscordPresence {
                     .large_text(large_text)
                     .small_text("Nebulya Launcher"),
             )
-            .buttons(vec![Button::new("✦ Nebula-rust", GITHUB_URL)]);
+            .buttons(vec![Button::new("★ Nebula-rust", GITHUB_URL)]);
         if let Some(c) = self.client.as_mut() {
             if c.set_activity(payload).is_err() {
                 self.connected = false;

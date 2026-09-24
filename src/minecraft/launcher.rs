@@ -118,7 +118,7 @@ pub async fn prepare_and_launch(
         on_progress(LaunchProgress {
             step: format!("라이브러리 ({}/{})", i + 1, all_libs.len()),
             done: i as u64,
-            total: total,
+            total,
         });
 
         if let Some(dl) = &lib.downloads {
@@ -313,7 +313,7 @@ async fn download_file(
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let mut res = client.get(url).send().await?.error_for_status()?;
+    let res = client.get(url).send().await?.error_for_status()?;
     let mut file = tokio::fs::File::create(dest).await?;
     use futures_util::StreamExt;
     let mut stream = res.bytes_stream();

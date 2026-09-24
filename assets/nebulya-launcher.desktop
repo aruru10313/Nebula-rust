@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Nebulya Launcher
+GenericName=Fabric Minecraft Launcher
+Comment=Rust 기반 Fabric 마인크래프트 런처 (Modrinth/CurseForge/Discord 지원)
+Exec=/usr/bin/nebulya-launcher
+Terminal=false
+Type=Application
+Categories=Game;
+StartupNotify=true
+StartupWMClass=nebulya-launcher
+Keywords=minecraft;fabric;modrinth;game;

@@ -4,7 +4,7 @@ use crate::ui::theme;
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
     ui.horizontal(|ui| {
-        theme::section_header(ui, "✦", "인스턴스", "MC 버전 + Fabric 조합");
+        theme::section_header(ui, "★", "인스턴스", "MC 버전 + Fabric 조합");
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if theme::accent_button(ui, "＋ 새 인스턴스").clicked() {
                 app.show_new_instance = true;
@@ -25,7 +25,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             ui.horizontal(|ui| {
                 // 상태 점
                 ui.label(
-                    egui::RichText::new(if selected { "✦" } else { "✧" })
+                    egui::RichText::new(if selected { "★" } else { "☆" })
                         .size(22.0)
                         .color(if selected {
                             theme::NEBULA_LIGHT

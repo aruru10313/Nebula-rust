@@ -4,9 +4,9 @@
 //! - BG: 거의 검은 남청색 (우주)
 //! - 카드: 짙은 인디고 + 별빛 테두리
 //! - 강조: 성운 바이올렛 → hover 라벤더, 포인트 핑크
-//! - 장식: ✦ 반짝이, 별 구분선, 히어로 성운 페인터
+//! - 장식: ★ 반짝이, 별 구분선, 히어로 성운 페인터
 
-use egui::{Color32, CornerRadius, Margin, Stroke, Style, Visuals};
+use egui::{Color32, CornerRadius, Margin, Stroke, Visuals};
 
 // ---- 팔레트 ----
 pub const SPACE: Color32 = Color32::from_rgb(7, 8, 16); // 우주 배경
@@ -28,15 +28,14 @@ pub const SUCCESS: Color32 = Color32::from_rgb(52, 211, 153);
 pub const WARN: Color32 = Color32::from_rgb(251, 191, 36);
 pub const DANGER: Color32 = Color32::from_rgb(248, 113, 113);
 
-// 구 이름 호환
-pub const ACCENT: Color32 = NEBULA;
+// 구 이름 호환 (외부 참조용)
 pub const ACCENT_HOVER: Color32 = NEBULA_LIGHT;
-pub const BG_DARK: Color32 = SPACE;
-pub const TEXT_MAIN: Color32 = STARLIGHT;
 
 pub fn apply_theme(ctx: &egui::Context) {
-    let mut style = Style::default();
-    style.visuals = dark_visuals();
+    let mut style = egui::Style {
+        visuals: dark_visuals(),
+        ..Default::default()
+    };
     style.spacing.item_spacing = egui::vec2(10.0, 10.0);
     style.spacing.button_padding = egui::vec2(14.0, 8.0);
     style.visuals.widgets.inactive.corner_radius = CornerRadius::same(10);
@@ -156,7 +155,7 @@ pub fn danger_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
 }
 
 // ---- 장식 ----
-/// 섹션 헤더: ✦ 제목 + 희미한 부제
+/// 섹션 헤더: ★ 제목 + 희미한 부제
 pub fn section_header(ui: &mut egui::Ui, sparkle: &str, title: &str, subtitle: &str) {
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(sparkle).color(NEBULA_LIGHT).size(16.0));
@@ -167,11 +166,11 @@ pub fn section_header(ui: &mut egui::Ui, sparkle: &str, title: &str, subtitle: &
     });
 }
 
-/// 별 구분선: ✦ ── ✦ ── ✦
+/// 별 구분선: ★ ── ★ ── ★
 pub fn star_divider(ui: &mut egui::Ui) {
     ui.vertical_centered(|ui| {
         ui.label(
-            egui::RichText::new("✦ ───────── ✦ ───────── ✦")
+            egui::RichText::new("★ ───────── ★ ───────── ★")
                 .color(TEXT_FAINT)
                 .size(11.0),
         );

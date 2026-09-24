@@ -32,6 +32,13 @@ pub struct LauncherConfig {
     /// Discord Developers Application ID (비어있으면 Activity 비활성화)
     #[serde(default)]
     pub discord_client_id: String,
+    /// Microsoft Client ID (Azure 앱 등록, 정품 로그인용)
+    /// 환경변수 NEBULYA_MS_CLIENT_ID 가 있으면 그 값을 우선 사용
+    #[serde(default)]
+    pub ms_client_id: String,
+    /// 저장된 정품 계정 (로그인 시 생성, refresh_token으로 자동 갱신)
+    #[serde(default)]
+    pub account: Option<crate::minecraft::auth::StoredAccount>,
 }
 
 fn default_true() -> bool {
@@ -53,6 +60,8 @@ impl Default for LauncherConfig {
             curseforge_api_key: String::new(),
             discord_enabled: true,
             discord_client_id: String::new(),
+            ms_client_id: String::new(),
+            account: None,
         }
     }
 }
@@ -96,6 +105,14 @@ impl LauncherConfig {
             return self.curseforge_api_key.clone();
         }
         std::env::var("NEBULYA_CF_API_KEY").unwrap_or_default()
+    }
+
+    /// MS Client ID (설정값 → 환경변수 순)
+    pub fn ms_client_id_resolved(&self) -> String {
+        if !self.ms_client_id.trim().is_empty() {
+            return self.ms_client_id.clone();
+        }
+        std::env::var("NEBULYA_MS_CLIENT_ID").unwrap_or_default()
     }
 }
 

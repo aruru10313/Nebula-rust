@@ -12,7 +12,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::paint_nebula(ui.ctx(), hero_rect);
 
     // 히어로 위 콘텐츠 오버레이
-    ui.allocate_new_ui(egui::UiBuilder::new().max_rect(hero_rect.shrink(18.0)), |ui| {
+    ui.scope_builder(egui::UiBuilder::new().max_rect(hero_rect.shrink(18.0)), |ui| {
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(

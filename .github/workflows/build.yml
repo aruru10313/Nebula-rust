@@ -91,13 +91,14 @@ jobs:
           cp dist/*.exe dist/windows/ 2>/dev/null || true
           ls -lh dist/windows
 
+      # 설치 파일만 업로드 (용량 절약) + 1일 보관 (무료 할당량 초과 방지)
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: |
-            nebulya-launcher-${{ matrix.target }}${{ matrix.ext }}
-            dist/**/*
+          retention-days: 1
+          compression-level: 9
+          path: dist/**/*
 
   release:
     name: Release

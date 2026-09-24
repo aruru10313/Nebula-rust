@@ -1,12 +1,13 @@
-# Nebulya Launcher — Rust 기반 Fabric 런처 (v0.2)
+# Nebulya Launcher — Rust 기반 Fabric 런처 (v0.3)
 
 Lunar Client / 구 Feather Client / Dawn Launcher 스타일을 목표로 한
 Rust 네이티브 마인크래프트 **Fabric 전용** 런처입니다.
 
 - 단일 바이너리 GUI (`eframe` + `egui`, WebView 불필요 → GitHub Actions 빌드 간단)
 - Mojang 버전 매니페스트 + Fabric Meta API 연동
+- **Microsoft 정품 로그인** (Device Code → Xbox → MC Services, refresh 자동 갱신)
 - **Modrinth + CurseForge (Fabric 강제 필터)** 검색·설치·활성화/삭제
-- **Discord Activity** (대기 중 / 검색 중 / 플레이 중 / 설정 중)
+- **Discord Activity** (대기/검색/플레이/설정 + 경과 시간 + GitHub 버튼)
 - Java 자동탐지 + RAM/해상도 설정 + 인스턴스(프로필) 관리
 - Win/Linux/macOS 설치 파일 자동 생성 (Setup exe / .deb+tar.gz / .dmg+tar.gz)
 
@@ -19,6 +20,14 @@ cargo run --release
 ```
 
 필요 조건: Rust stable, Java 17+ (마인크 1.20+ 기준)
+
+## 정품 로그인
+
+1. [Azure Portal](https://portal.azure.com/) → 앱 등록 → 애플리케이션(클라이언트) ID 복사
+   (리디렉션 URI 불필요, Device Code 방식)
+2. 설정 탭 → MS Client ID에 붙여넣기 (또는 환경변수 `NEBULYA_MS_CLIENT_ID`)
+3. `✦ Microsoft 로그인` → 브라우저에서 코드 입력 → 완료
+4. 이후 실행 시 토큰 자동 갱신, 실패하면 오프라인으로 폴백
 
 ## 모드 (Fabric 전용)
 
@@ -33,8 +42,9 @@ cargo run --release
 
 1. https://discord.com/developers/applications 에서 앱 생성
 2. Client ID를 설정 탭 → Discord Activity에 입력 → 저장
-3. 디스코드가 켜져 있으면 홈/검색/플레이/설정 상태가 표시됨
-4. 디스코드가 꺼져 있으면 조용히 비활성화 (런처 정상 동작)
+3. 디스코드가 켜져 있으면 홈/검색/플레이/설정 + 경과 시간이 표시됨
+4. 사이드바 유저 카드에서 🟢활동 표시 중 / 🟡연결 대기 중 / ⚪꺼짐 확인 가능
+5. 디스코드가 꺼져 있으면 자동으로 비활성화 (런처 정상 동작)
 
 ## 구조
 
@@ -83,13 +93,17 @@ bash scripts/package-macos.sh aarch64-apple-darwin
 
 GitHub Actions가 `main` 푸시 / `v*` 태그마다 3OS 빌드+패키징을 자동 수행하고,
 태그 푸시 시 Release에 설치 파일을 첨부합니다.
+아티팩트는 용량 절약을 위해 설치 파일만, 1일 보관입니다.
+
+> Artifact quota 초과 에러가 나면: Actions 실행 페이지에서 오래된 아티팩트를
+> 지우고 6~12시간 뒤 사용량이 재계산될 때까지 기다리세요.
 
 ## 로드맵
 
 - [x] 기초 틀 + Vanilla/Fabric 실행 (오프라인)
+- [x] Microsoft 정품 로그인 + 자동 갱신
 - [x] Modrinth / CurseForge Fabric 모드 관리
-- [x] Discord Activity
+- [x] Discord Activity (타임스탬프/버튼/연결 표시)
 - [x] 3OS 설치 파일 틀
-- [ ] MS OAuth 로그인 (Client ID 발급 후 `auth.rs` 활성화)
 - [ ] 실시간 게임 로그 스트리밍 + 크래시 리포트
 - [ ] 디자인 고도화 (커스텀 타이틀바, 애니메이션, 테마)

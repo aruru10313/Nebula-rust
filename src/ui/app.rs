@@ -1,5 +1,5 @@
 use crate::core::{Instance, LauncherConfig, instance};
-use crate::minecraft::auth::MinecraftSession;
+use crate::minecraft::auth::LoginState;
 use crate::minecraft::discord::DiscordPresence;
 use crate::minecraft::launcher::LaunchProgress;
 use std::sync::{Arc, Mutex};
@@ -48,6 +48,7 @@ pub struct NebulyaApp {
     pub show_new_instance: bool,
     pub mods_ui: crate::ui::screens::mods::ModsUiState,
     pub discord: DiscordPresence,
+    pub login_state: Arc<Mutex<LoginState>>,
     pub runtime: tokio::runtime::Runtime,
     pub http: reqwest::Client,
     progress_state: Arc<Mutex<Option<LaunchProgress>>>,
@@ -87,6 +88,7 @@ impl NebulyaApp {
             show_new_instance: false,
             mods_ui: crate::ui::screens::mods::ModsUiState::default(),
             discord,
+            login_state: Arc::new(Mutex::new(LoginState::Idle)),
             runtime,
             http,
             progress_state: Arc::new(Mutex::new(None)),
@@ -128,6 +130,115 @@ impl NebulyaApp {
         }
         let id = self.config.selected_instance.clone()?;
         self.instances.iter_mut().find(|i| i.id == id)
+    }
+
+    /// Microsoft 정품 로그인 시작 (백그라운드 스레드)
+    pub fn start_ms_login(&mut self) {
+        if let Ok(s) = self.login_state.lock() {
+            if !matches!(*s, LoginState::Idle) {
+                return; // 이미 진행 중
+            }
+        }
+        let client_id = self.config.ms_client_id_resolved();
+        if client_id.is_empty() {
+            self.status =
+                "MS Client ID가 없습니다. Azure 앱 등록 후 입력하세요.".to_string();
+            return;
+        }
+        let state = self.login_state.clone();
+        let http = self.http.clone();
+        *self.login_state.lock().unwrap() = LoginState::Working("코드 요청 중...".into());
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build();
+            let rt = match rt {
+                Ok(rt) => rt,
+                Err(e) => {
+                    *state.lock().unwrap() =
+                        LoginState::Failed(format!("런타임 오류: {e}"));
+                    return;
+                }
+            };
+            rt.block_on(async {
+                let set = |s: LoginState| {
+                    *state.lock().unwrap() = s;
+                };
+                // 1. device code
+                let dc = match crate::minecraft::auth::request_device_code(&http, &client_id).await
+                {
+                    Ok(dc) => dc,
+                    Err(e) => {
+                        set(LoginState::Failed(format!("{e:#}")));
+                        return;
+                    }
+                };
+                set(LoginState::Code {
+                    user_code: dc.user_code.clone(),
+                    uri: dc.verification_uri.clone(),
+                });
+                // 2. 승인 대기
+                let ms = match crate::minecraft::auth::poll_device_token(
+                    &http,
+                    &client_id,
+                    &dc,
+                    |left| {
+                        *state.lock().unwrap() =
+                            LoginState::Working(format!("브라우저 승인 대기 중... ({left}초)"));
+                    },
+                )
+                .await
+                {
+                    Ok(ms) => ms,
+                    Err(e) => {
+                        set(LoginState::Failed(format!("{e:#}")));
+                        return;
+                    }
+                };
+                // 3. Xbox → MC 체인
+                set(LoginState::Working("Xbox 연결 중...".into()));
+                match crate::minecraft::auth::login_with_ms_token(
+                    &http,
+                    &ms.access_token,
+                    &ms.refresh_token,
+                )
+                .await
+                {
+                    Ok(acc) => set(LoginState::Done(acc)),
+                    Err(e) => set(LoginState::Failed(format!("{e:#}"))),
+                }
+            });
+        });
+    }
+
+    /// 로그인 상태 폴링 (매 프레임) — 완료/실패를 config에 반영
+    fn poll_login_state(&mut self) {
+        let snapshot = self.login_state.lock().unwrap().clone();
+        match snapshot {
+            LoginState::Idle => {}
+            LoginState::Code { .. } | LoginState::Working(_) => {
+                // 상태 표시는 설정 화면에서 렌더링
+            }
+            LoginState::Done(acc) => {
+                self.config.username = acc.username.clone();
+                self.config.account = Some(acc.clone());
+                self.persist();
+                self.status = format!("✦ {}님, 정품 로그인 완료", acc.username);
+                self.log(format!("정품 로그인: {} ({})", acc.username, acc.uuid));
+                *self.login_state.lock().unwrap() = LoginState::Idle;
+            }
+            LoginState::Failed(msg) => {
+                self.status = format!("로그인 실패: {msg}");
+                self.log(format!("로그인 실패: {msg}"));
+                *self.login_state.lock().unwrap() = LoginState::Idle;
+            }
+        }
+    }
+
+    /// Microsoft 로그인 취소 (다음 폴링 사이클에서 스레드 종료)
+    pub fn cancel_ms_login(&mut self) {
+        *self.login_state.lock().unwrap() = LoginState::Idle;
+        self.status = "로그인 취소됨".to_string();
     }
 
     pub fn log(&mut self, msg: impl Into<String>) {
@@ -195,7 +306,22 @@ impl NebulyaApp {
             return;
         };
         let config = self.config.clone();
-        let session = MinecraftSession::offline(&config.username);
+        // 정품 계정이 있으면 갱신 시도, 없거나 실패하면 오프라인
+        let (session, refreshed) = self.runtime.block_on(crate::minecraft::auth::ensure_session(
+            &self.http,
+            &config.ms_client_id_resolved(),
+            &config.username,
+            config.account.as_ref(),
+        ));
+        if let Some(acc) = refreshed {
+            self.config.account = Some(acc);
+            self.config.username = self.config.account.as_ref().unwrap().username.clone();
+            self.persist();
+            self.log("정품 토큰 자동 갱신됨");
+        }
+        if session.offline && self.config.account.is_some() {
+            self.log("정품 갱신 실패 — 오프라인으로 실행합니다");
+        }
         self.launching = true;
         self.status = format!("실행 준비 중... ({})", inst.display_version());
         self.log(format!("▶ 실행: {} [{}]", inst.name, inst.display_version()));
@@ -258,6 +384,8 @@ impl NebulyaApp {
 
 impl eframe::App for NebulyaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // MS 로그인 상태 반영
+        self.poll_login_state();
         // progress 상태 동기화
         if let Ok(guard) = self.progress_state.lock() {
             if guard.is_some() {
@@ -350,12 +478,14 @@ impl eframe::App for NebulyaApp {
                                         .size(13.0)
                                         .strong(),
                                 );
-                                let (dot, txt) = if self.config.discord_enabled
-                                    && !self.config.discord_client_id.trim().is_empty()
+                                let (dot, txt) = if !self.config.discord_enabled
+                                    || self.config.discord_client_id.trim().is_empty()
                                 {
-                                    ("🟢", "Discord 연결됨")
+                                    ("⚪", "Discord 꺼짐")
+                                } else if self.discord.is_connected() {
+                                    ("🟢", "활동 표시 중")
                                 } else {
-                                    ("⚪", "오프라인")
+                                    ("🟡", "연결 대기 중")
                                 };
                                 ui.label(
                                     egui::RichText::new(format!("{dot} {txt}"))

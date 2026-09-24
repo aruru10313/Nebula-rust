@@ -1,0 +1,108 @@
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+/// 런처 전역 설정. `~/.nebulya-launcher/config.json` 에 저장됨.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LauncherConfig {
+    /// Mojang/Microsoft 계정 이름 (오프라인 모드에서도 사용)
+    pub username: String,
+    /// 할당 RAM (MB)
+    pub ram_mb: u32,
+    /// 최소 RAM (MB)
+    pub min_ram_mb: u32,
+    /// Java 실행 파일 경로 (비어있으면 자동탐지)
+    pub java_path: String,
+    /// 게임 해상도
+    pub width: u32,
+    pub height: u32,
+    /// 선택된 인스턴스 id
+    pub selected_instance: Option<String>,
+    /// 게임 디렉토리 루트
+    pub game_root: PathBuf,
+    /// 닫기 시 런처 숨기기 (Lunar 스타일)
+    pub hide_on_launch: bool,
+    /// CurseForge API 키 (console.curseforge.com 발급, 없으면 Modrinth만 사용)
+    /// 환경변수 NEBULYA_CF_API_KEY 가 있으면 그 값을 우선 사용
+    #[serde(default)]
+    pub curseforge_api_key: String,
+    /// Discord Activity 표시 여부
+    #[serde(default = "default_true")]
+    pub discord_enabled: bool,
+    /// Discord Developers Application ID (비어있으면 Activity 비활성화)
+    #[serde(default)]
+    pub discord_client_id: String,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for LauncherConfig {
+    fn default() -> Self {
+        Self {
+            username: "Player".to_string(),
+            ram_mb: 4096,
+            min_ram_mb: 1024,
+            java_path: String::new(),
+            width: 854,
+            height: 480,
+            selected_instance: None,
+            game_root: default_game_root(),
+            hide_on_launch: false,
+            curseforge_api_key: String::new(),
+            discord_enabled: true,
+            discord_client_id: String::new(),
+        }
+    }
+}
+
+impl LauncherConfig {
+    pub fn config_path() -> PathBuf {
+        default_game_root().join("config.json")
+    }
+
+    pub fn load() -> Self {
+        let path = Self::config_path();
+        if let Ok(bytes) = std::fs::read(&path) {
+            if let Ok(cfg) = serde_json::from_slice::<Self>(&bytes) {
+                return cfg;
+            }
+        }
+        Self::default()
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let path = Self::config_path();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).context("config dir 생성 실패")?;
+        }
+        let json = serde_json::to_string_pretty(self)?;
+        std::fs::write(&path, json).context("config 저장 실패")?;
+        Ok(())
+    }
+
+    /// 실제 사용할 Java 경로 (비어있으면 자동탐지 결과)
+    pub fn effective_java(&self) -> String {
+        if !self.java_path.trim().is_empty() {
+            return self.java_path.clone();
+        }
+        crate::minecraft::java::find_java().unwrap_or_else(|| "java".to_string())
+    }
+
+    /// CurseForge API 키 (설정값 → 환경변수 순)
+    pub fn curseforge_key(&self) -> String {
+        if !self.curseforge_api_key.trim().is_empty() {
+            return self.curseforge_api_key.clone();
+        }
+        std::env::var("NEBULYA_CF_API_KEY").unwrap_or_default()
+    }
+}
+
+pub fn default_game_root() -> PathBuf {
+    if let Some(home) = dirs::home_dir() {
+        home.join(".nebulya-launcher")
+    } else {
+        PathBuf::from(".nebulya-launcher")
+    }
+}

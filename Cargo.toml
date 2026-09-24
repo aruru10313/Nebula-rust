@@ -1,0 +1,70 @@
+[package]
+name = "nebulya-launcher"
+version = "0.2.0"
+edition = "2021"
+description = "Nebulya Launcher - Rust 기반 Fabric Minecraft 런처 (Lunar/Feather/Dawn 스타일)"
+authors = ["Nebulya"]
+license = "MIT"
+repository = "https://github.com/aruru10313/Nebula-rust"
+
+[dependencies]
+# GUI - Lunar/Dawn 스타일 커스텀 디자인용 (단일 바이너리, WebView 불필요)
+eframe = { version = "0.32", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui = "0.32"
+egui_extras = { version = "0.32", features = ["default"] }
+
+# Async / HTTP
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+futures-util = "0.3"
+
+# Serde
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Utils
+anyhow = "1"
+thiserror = "2"
+dirs = "6"
+uuid = { version = "1", features = ["v4", "v3", "serde"] }
+chrono = { version = "0.4", features = ["serde", "clock"] }
+sha1 = "0.10"
+hex = "0.4"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+open = "5"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rfd = "0.15"
+image = { version = "0.25", default-features = false, features = ["png"] }
+urlencoding = "2"
+
+# Discord Activity (IPC — 디스코드 미실행 시 조용히 비활성화)
+discord-rich-presence = "1"
+
+[dev-dependencies]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+codegen-units = 1
+
+[profile.dev]
+opt-level = 0
+
+# cargo-deb (Linux .deb 패키징용 메타데이터)
+[package.metadata.deb]
+maintainer = "Nebulya <https://github.com/aruru10313/Nebula-rust>"
+copyright = "2026, Nebulya"
+license-file = []
+section = "games"
+priority = "optional"
+assets = [
+  ["target/x86_64-unknown-linux-gnu/release/nebulya-launcher", "usr/bin/", "755"],
+  ["README.md", "usr/share/doc/nebulya-launcher/", "644"],
+]
+description = "Nebulya Launcher - Rust 기반 Fabric Minecraft 런처"
+extended-description = """\
+Lunar / Dawn 스타일의 Rust 네이티브 Fabric 런처.
+Modrinth + CurseForge(Fabric) 모드 관리, Discord Activity 지원.\
+"""

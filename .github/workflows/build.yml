@@ -1,0 +1,118 @@
+name: Build Nebulya Launcher
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build + Package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: .exe
+            artifact: nebulya-launcher-windows
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: ""
+            artifact: nebulya-launcher-linux
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: ""
+            artifact: nebulya-launcher-macos-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # Linux eframe/egui 의존성 (X11/Wayland/glow)
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxcb1-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev \
+            libwayland-dev libxkbcommon-dev libasound2-dev libssl-dev pkg-config
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Rename binary
+        shell: bash
+        run: |
+          SRC="target/${{ matrix.target }}/release/nebulya-launcher${{ matrix.ext }}"
+          DST="nebulya-launcher-${{ matrix.target }}${{ matrix.ext }}"
+          cp "$SRC" "$DST"
+          ls -lh "$DST"
+
+      # ---------- OS별 설치 파일 ----------
+      - name: Install cargo-deb (Linux)
+        if: runner.os == 'Linux'
+        run: cargo install cargo-deb
+
+      - name: Package (Linux → tar.gz + .deb)
+        if: runner.os == 'Linux'
+        run: bash scripts/package-linux.sh ${{ matrix.target }}
+
+      - name: Package (macOS → .app tar.gz + .dmg)
+        if: runner.os == 'macOS'
+        run: bash scripts/package-macos.sh ${{ matrix.target }}
+
+      - name: Build installer (Windows → Setup exe)
+        if: runner.os == 'Windows'
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: installer/windows/nebulya-setup.iss
+          options: /DBinaryDir=target\${{ matrix.target }}\release
+
+      - name: Collect Windows dist
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p dist/windows
+          cp "nebulya-launcher-${{ matrix.target }}.exe" dist/windows/
+          cp dist/*.exe dist/windows/ 2>/dev/null || true
+          ls -lh dist/windows
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            nebulya-launcher-${{ matrix.target }}${{ matrix.ext }}
+            dist/**/*
+
+  release:
+    name: Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          generate_release_notes: true

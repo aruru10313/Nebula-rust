@@ -1,86 +1,123 @@
 use crate::ui::NebulyaApp;
+use crate::ui::theme;
 
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
-    ui.heading(
-        egui::RichText::new(format!("안녕하세요, {}님", app.config.username)).size(24.0).strong(),
-    );
-    ui.label(
-        egui::RichText::new("오늘도 네뷸랴와 함께 즐거운 마크 시간 되세요.")
-            .color(crate::ui::theme::TEXT_DIM),
-    );
-    ui.add_space(12.0);
 
-    ui.horizontal(|ui| {
-        // 선택된 인스턴스 카드
-        crate::ui::theme::card_frame().show(ui, |ui| {
-            ui.set_min_size(egui::vec2(420.0, 170.0));
-            if let Some(inst) = app.selected_instance().cloned() {
+    // ---- 성운 히어로 ----
+    let avail = ui.available_width();
+    let hero_h = 196.0;
+    let (hero_rect, _) =
+        ui.allocate_exact_size(egui::vec2(avail, hero_h), egui::Sense::hover());
+    theme::paint_nebula(ui.ctx(), hero_rect);
+
+    // 히어로 위 콘텐츠 오버레이
+    ui.allocate_new_ui(egui::UiBuilder::new().max_rect(hero_rect.shrink(18.0)), |ui| {
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
                 ui.label(
-                    egui::RichText::new("선택된 인스턴스")
+                    egui::RichText::new("✦ STELLAR FABRIC")
+                        .size(11.0)
+                        .color(theme::NEBULA_LIGHT),
+                );
+                ui.label(
+                    egui::RichText::new(format!(
+                        "안녕하세요, {}님",
+                        app.config.username
+                    ))
+                    .size(26.0)
+                    .strong()
+                    .color(egui::Color32::WHITE),
+                );
+                if let Some(inst) = app.selected_instance().cloned() {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(format!("◈ {}", inst.name))
+                                .size(14.0)
+                                .color(theme::STARLIGHT),
+                        );
+                        theme::badge(ui, &inst.display_version(), theme::STAR_BLUE);
+                    });
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "✦ {}회 항해{}",
+                            inst.total_plays,
+                            inst.last_played
+                                .map(|t| format!(" · 마지막: {}", t.format("%m/%d %H:%M")))
+                                .unwrap_or_default()
+                        ))
                         .size(12.0)
-                        .color(crate::ui::theme::TEXT_DIM),
-                );
-                ui.heading(egui::RichText::new(&inst.name).size(20.0).strong());
-                ui.label(
-                    egui::RichText::new(inst.display_version())
-                        .color(crate::ui::theme::ACCENT_HOVER),
-                );
-                ui.add_space(6.0);
-                ui.label(format!(
-                    "플레이 {}회{}",
-                    inst.total_plays,
-                    inst.last_played
-                        .map(|t| format!(" • 마지막: {}", t.format("%m/%d %H:%M")))
-                        .unwrap_or_default()
-                ));
-                ui.add_space(8.0);
-                if crate::ui::theme::accent_button(ui, "▶  지금 플레이").clicked() {
-                    app.launch();
+                        .color(theme::TEXT_DIM),
+                    );
+                } else {
+                    ui.label("인스턴스가 없습니다. 새로 만들어주세요.");
                 }
-            } else {
-                ui.label("인스턴스가 없습니다. 새로 만들어주세요.");
-            }
-        });
-
-        // 빠른 상태 카드
-        crate::ui::theme::card_frame().show(ui, |ui| {
-            ui.set_min_size(egui::vec2(300.0, 170.0));
-            ui.label(
-                egui::RichText::new("시스템")
-                    .size(12.0)
-                    .color(crate::ui::theme::TEXT_DIM),
-            );
-            let java = app.config.effective_java();
-            ui.label(format!("Java: {java}"));
-            if let Some(ver) = crate::minecraft::java::java_version(&java) {
-                ui.label(format!("버전: {ver}"));
-            }
-            ui.label(format!("RAM: {} MB", app.config.ram_mb));
-            ui.label(format!("루트: {}", app.config.game_root.display()));
-            ui.add_space(6.0);
-            if ui.small_button("Java 다시 찾기").clicked() {
-                if let Some(j) = crate::minecraft::java::find_java() {
-                    app.config.java_path = j;
-                }
-            }
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(28.0);
+                    if theme::accent_button(ui, "▶  지금 항해").clicked() && !app.launching {
+                        app.launch();
+                    }
+                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new(if app.launching {
+                            "워프 중..."
+                        } else {
+                            "fabric · Modrinth · CF"
+                        })
+                        .size(11.0)
+                        .color(theme::TEXT_DIM),
+                    );
+                });
+            });
         });
     });
 
     ui.add_space(12.0);
 
-    // 로그 카드 (Dawn 스타일 콘솔 미리보기)
-    crate::ui::theme::card_frame().show(ui, |ui| {
+    // ---- 스탯 타일 3개 ----
+    let (plays, mods_count, java_short) = {
+        let plays = app
+            .selected_instance()
+            .map(|i| i.total_plays.to_string())
+            .unwrap_or_else(|| "-".into());
+        let mods_count = app
+            .selected_instance()
+            .map(|i| i.scan_mod_files(&app.config.game_root).len().to_string())
+            .unwrap_or_else(|| "-".into());
+        let java = app.config.effective_java();
+        let ver = crate::minecraft::java::java_version(&java).unwrap_or_default();
+        let short = ver.split('.').take(2).collect::<Vec<_>>().join(".");
+        (plays, mods_count, short)
+    };
+    ui.horizontal(|ui| {
+        theme::stat_tile(ui, "🚀", &plays, "항해 횟수", theme::NEBULA_LIGHT);
+        theme::stat_tile(ui, "◈", &mods_count, "탑재 모드", theme::STAR_PINK);
+        theme::stat_tile(
+            ui,
+            "☕",
+            if java_short.is_empty() { "-" } else { &java_short },
+            "Java 버전",
+            theme::STAR_BLUE,
+        );
+        theme::stat_tile(ui, "💾", &format!("{}M", app.config.ram_mb), "할당 RAM", theme::SUCCESS);
+    });
+
+    ui.add_space(12.0);
+
+    // ---- 항해일지 (로그) ----
+    theme::glow_card_frame().show(ui, |ui| {
         ui.horizontal(|ui| {
-            ui.heading("최근 로그");
+            theme::section_header(ui, "✎", "항해일지", "최근 로그");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.small_button("지우기").clicked() {
+                if theme::ghost_button(ui, "지우기").clicked() {
                     app.logs.clear();
                 }
             });
         });
-        ui.separator();
-        egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
+        ui.add_space(4.0);
+        egui::ScrollArea::vertical().max_height(180.0).show(ui, |ui| {
             for line in app.logs.iter().rev().take(60) {
                 ui.monospace(line);
             }

@@ -35,8 +35,14 @@ pub struct ModsUiState {
     pub message: String,
 }
 
-fn format_downloads(n: f64) -> String {
-    if n >= 1_000_000.0 {
+fn provider_label(p: ModProvider) -> &'static str {
+    match p {
+        ModProvider::Modrinth => "Modrinth · 키 불필요",
+        ModProvider::CurseForge => "CurseForge · API 키 필요",
+    }
+}
+
+fn format_downloads(n: f64) -> String {    if n >= 1_000_000.0 {
         format!("{:.1}M", n / 1_000_000.0)
     } else if n >= 1_000.0 {
         format!("{:.1}K", n / 1_000.0)
@@ -251,14 +257,11 @@ impl NebulyaApp {
 }
 
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
+    use crate::ui::theme;
     ui.add_space(10.0);
     ui.horizontal(|ui| {
-        ui.heading("모드");
-        ui.label(
-            egui::RichText::new("Fabric 전용")
-                .size(12.0)
-                .color(crate::ui::theme::ACCENT_HOVER),
-        );
+        theme::section_header(ui, "◈", "모드", "Modrinth · CurseForge");
+        theme::badge(ui, "Fabric 전용", theme::NEBULA_LIGHT);
     });
     let mc = app
         .selected_instance()
@@ -315,8 +318,10 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
 
     // 검색 결과
     crate::ui::theme::card_frame().show(ui, |ui| {
-        ui.heading("검색 결과");
-        ui.separator();
+        ui.horizontal(|ui| {
+            theme::section_header(ui, "🔭", "검색 결과", provider_label(app.mods_ui.provider));
+        });
+        ui.add_space(2.0);
         match app.mods_ui.provider {
             ModProvider::Modrinth => {
                 if app.mods_ui.mr_results.is_empty() {
@@ -422,9 +427,9 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     // 설치된 모드
     crate::ui::theme::card_frame().show(ui, |ui| {
         ui.horizontal(|ui| {
-            ui.heading("설치된 모드");
+            theme::section_header(ui, "✦", "설치된 모드", "클릭으로 켜기/끄기");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.small_button("📂 폴더 열기").clicked() {
+                if theme::ghost_button(ui, "📂 폴더 열기").clicked() {
                     if let Some(inst) = app.selected_instance() {
                         let dir = inst.mods_dir(&app.config.game_root);
                         let _ = open::that(&dir);
@@ -432,7 +437,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 }
             });
         });
-        ui.separator();
+        ui.add_space(2.0);
         let files = app
             .selected_instance()
             .map(|i| i.scan_mod_files(&app.config.game_root))
@@ -450,28 +455,37 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     m.file_name == file_name
                         || m.file_name.trim_end_matches(".disabled") == file_name.trim_end_matches(".disabled")
                 });
-                let label = if let Some(m) = meta {
-                    format!("{}  [{} {}]", file_name, m.source.as_str(), m.version)
-                } else {
-                    file_name.clone()
-                };
-                ui.horizontal(|ui| {
-                    ui.label(if enabled { "✅" } else { "⏸" });
-                    ui.monospace(label);
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let f = file_name.clone();
-                        if ui.small_button("🗑").clicked() {
-                            app.delete_installed_mod(&f);
-                        }
-                        let f2 = file_name.clone();
-                        if ui
-                            .small_button(if enabled { "끄기" } else { "켜기" })
-                            .clicked()
-                        {
-                            app.toggle_installed_mod(&f2);
-                        }
+                theme::tile_frame().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(if enabled { "✅" } else { "⏸" }).size(16.0),
+                        );
+                        ui.vertical(|ui| {
+                            ui.monospace(&file_name);
+                            if let Some(m) = meta {
+                                ui.horizontal(|ui| {
+                                    theme::badge(ui, m.source.as_str(), theme::NEBULA_LIGHT);
+                                    if !m.version.is_empty() {
+                                        theme::badge(ui, &m.version, theme::STAR_BLUE);
+                                    }
+                                });
+                            }
+                        });
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let f = file_name.clone();
+                            if theme::danger_button(ui, "삭제").clicked() {
+                                app.delete_installed_mod(&f);
+                            }
+                            let f2 = file_name.clone();
+                            if theme::ghost_button(ui, if enabled { "끄기" } else { "켜기" })
+                                .clicked()
+                            {
+                                app.toggle_installed_mod(&f2);
+                            }
+                        });
                     });
                 });
+                ui.add_space(4.0);
             }
         }
     });

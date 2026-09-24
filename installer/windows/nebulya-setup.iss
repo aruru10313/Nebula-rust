@@ -3,7 +3,7 @@
 ; 로컬: iscc installer/windows/nebulya-setup.iss /DBinaryDir=target\x86_64-pc-windows-msvc\release
 
 #define MyAppName "Nebulya Launcher"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.3.0"
 #define MyAppPublisher "Nebulya"
 #define MyAppURL "https://github.com/aruru10313/Nebula-rust"
 #define MyAppExeName "nebulya-launcher.exe"

@@ -80,7 +80,7 @@ impl NebulyaApp {
             status: "준비됨".to_string(),
             progress: None,
             launching: false,
-            logs: vec!["Nebulya Launcher v0.2 초기화".to_string()],
+            logs: vec!["✦ Nebulya Launcher v0.3 stellar 초기화".to_string()],
             new_instance_name: "새 인스턴스".to_string(),
             new_mc_version: "1.20.1".to_string(),
             new_loader_version: "0.16.9".to_string(),
@@ -268,38 +268,54 @@ impl eframe::App for NebulyaApp {
             }
         }
 
-        // 좌측 사이드바 (Lunar 스타일)
+        // 좌측 사이드바 — 별빛 내비게이션
         egui::SidePanel::left("sidebar")
-            .exact_width(210.0)
+            .exact_width(224.0)
             .resizable(false)
             .show(ctx, |ui| {
-                ui.add_space(14.0);
+                ui.add_space(18.0);
+                // 로고
                 ui.vertical_centered(|ui| {
-                    ui.heading(egui::RichText::new("NEBULYA").size(22.0).strong().color(
-                        crate::ui::theme::ACCENT_HOVER,
-                    ));
                     ui.label(
-                        egui::RichText::new("FABRIC LAUNCHER")
-                            .size(10.0)
-                            .color(crate::ui::theme::TEXT_DIM),
+                        egui::RichText::new("✦")
+                            .size(34.0)
+                            .color(crate::ui::theme::NEBULA_LIGHT),
+                    );
+                    ui.heading(
+                        egui::RichText::new("NEBULYA")
+                            .size(24.0)
+                            .strong()
+                            .color(crate::ui::theme::STARLIGHT),
+                    );
+                    ui.label(
+                        egui::RichText::new("S T E L L A R · F A B R I C")
+                            .size(9.0)
+                            .color(crate::ui::theme::TEXT_FAINT),
                     );
                 });
-                ui.add_space(12.0);
-                ui.separator();
-                ui.add_space(8.0);
+                ui.add_space(10.0);
+                crate::ui::theme::star_divider(ui);
+                ui.add_space(6.0);
 
                 for tab in [Tab::Home, Tab::Instances, Tab::Mods, Tab::Settings] {
                     let selected = self.tab == tab;
                     let label = format!("{}  {}", tab.icon(), tab.label());
                     let rich = if selected {
-                        egui::RichText::new(label).size(14.0).strong()
+                        egui::RichText::new(label).size(14.0).strong().color(
+                            egui::Color32::WHITE,
+                        )
                     } else {
-                        egui::RichText::new(label).size(14.0)
+                        egui::RichText::new(label)
+                            .size(14.0)
+                            .color(crate::ui::theme::TEXT_DIM)
                     };
-                    let btn = egui::Button::new(rich)
+                    let mut btn = egui::Button::new(rich)
                         .selected(selected)
-                        .min_size(egui::vec2(180.0, 38.0))
-                        .corner_radius(egui::CornerRadius::same(10));
+                        .min_size(egui::vec2(192.0, 40.0))
+                        .corner_radius(egui::CornerRadius::same(12));
+                    if selected {
+                        btn = btn.fill(crate::ui::theme::NEBULA);
+                    }
                     if ui.add(btn).clicked() {
                         self.tab = tab;
                         // 탭 이동 시 Discord 상태 반영
@@ -315,60 +331,100 @@ impl eframe::App for NebulyaApp {
                 }
 
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
-                    ui.add_space(10.0);
-                    ui.label(
-                        egui::RichText::new("v0.2.0 • Fabric 전용")
-                            .size(11.0)
-                            .color(crate::ui::theme::TEXT_DIM),
-                    );
+                    ui.add_space(12.0);
+                    ui.vertical_centered(|ui| {
+                        crate::ui::theme::badge(ui, "✦ v0.3.0 stellar", crate::ui::theme::NEBULA_LIGHT);
+                    });
+                    ui.add_space(6.0);
+                    // 유저 카드
+                    crate::ui::theme::tile_frame().show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new("★")
+                                    .size(20.0)
+                                    .color(crate::ui::theme::STAR_PINK),
+                            );
+                            ui.vertical(|ui| {
+                                ui.label(
+                                    egui::RichText::new(&self.config.username)
+                                        .size(13.0)
+                                        .strong(),
+                                );
+                                let (dot, txt) = if self.config.discord_enabled
+                                    && !self.config.discord_client_id.trim().is_empty()
+                                {
+                                    ("🟢", "Discord 연결됨")
+                                } else {
+                                    ("⚪", "오프라인")
+                                };
+                                ui.label(
+                                    egui::RichText::new(format!("{dot} {txt}"))
+                                        .size(11.0)
+                                        .color(crate::ui::theme::TEXT_DIM),
+                                );
+                            });
+                        });
+                    });
                     ui.add_space(4.0);
-                    ui.label(
-                        egui::RichText::new(format!("👤 {}", self.config.username))
-                            .size(12.0)
-                            .color(crate::ui::theme::TEXT_DIM),
-                    );
-                    ui.add_space(8.0);
                 });
             });
 
         // 상단 바: 선택된 인스턴스 + 플레이
-        egui::TopBottomPanel::top("topbar").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.add_space(8.0);
-                ui.label(egui::RichText::new("인스턴스").color(crate::ui::theme::TEXT_DIM));
-                let mut selected_id = self
-                    .config
-                    .selected_instance
-                    .clone()
-                    .or_else(|| self.instances.first().map(|i| i.id.clone()))
-                    .unwrap_or_default();
-                egui::ComboBox::from_id_salt("instance_select")
-                    .selected_text(
-                        self.selected_instance()
-                            .map(|i| format!("{} ({})", i.name, i.display_version()))
-                            .unwrap_or_else(|| "없음".into()),
-                    )
-                    .show_ui(ui, |ui| {
-                        for inst in &self.instances {
-                            ui.selectable_value(
-                                &mut selected_id,
-                                inst.id.clone(),
-                                format!("{} ({})", inst.name, inst.display_version()),
-                            );
+        egui::TopBottomPanel::top("topbar")
+            .frame(
+                egui::Frame::new()
+                    .fill(crate::ui::theme::BG_PANEL)
+                    .inner_margin(egui::Margin {
+                        left: 16,
+                        right: 16,
+                        top: 10,
+                        bottom: 10,
+                    }),
+            )
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new("◈  INSTANCE")
+                            .size(11.0)
+                            .color(crate::ui::theme::TEXT_FAINT),
+                    );
+                    let mut selected_id = self
+                        .config
+                        .selected_instance
+                        .clone()
+                        .or_else(|| self.instances.first().map(|i| i.id.clone()))
+                        .unwrap_or_default();
+                    egui::ComboBox::from_id_salt("instance_select")
+                        .selected_text(
+                            self.selected_instance()
+                                .map(|i| format!("✦ {}  ·  {}", i.name, i.display_version()))
+                                .unwrap_or_else(|| "없음".into()),
+                        )
+                        .show_ui(ui, |ui| {
+                            for inst in &self.instances {
+                                ui.selectable_value(
+                                    &mut selected_id,
+                                    inst.id.clone(),
+                                    format!("✦ {}  ·  {}", inst.name, inst.display_version()),
+                                );
+                            }
+                        });
+                    if !selected_id.is_empty() {
+                        self.config.selected_instance = Some(selected_id);
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let btn_label = if self.launching {
+                            "✦  실행 중..."
+                        } else {
+                            "▶  플레이"
+                        };
+                        let resp = crate::ui::theme::accent_button(ui, btn_label);
+                        if resp.clicked() && !self.launching {
+                            self.launch();
                         }
                     });
-                if !selected_id.is_empty() {
-                    self.config.selected_instance = Some(selected_id);
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let btn_label = if self.launching { "실행 중..." } else { "▶  플레이" };
-                    let resp = crate::ui::theme::accent_button(ui, btn_label);
-                    if resp.clicked() && !self.launching {
-                        self.launch();
-                    }
                 });
             });
-        });
 
         // 중앙 컨텐츠
         egui::CentralPanel::default().show(ctx, |ui| match self.tab {
@@ -378,26 +434,40 @@ impl eframe::App for NebulyaApp {
             Tab::Settings => crate::ui::screens::settings::show(self, ui),
         });
 
-        // 하단 상태바
-        egui::TopBottomPanel::bottom("statusbar").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new(format!("● {}", self.status))
-                        .size(12.0)
-                        .color(crate::ui::theme::TEXT_DIM),
-                );
-                if let Some(p) = &self.progress {
-                    if p.total > 0 {
-                        let frac = (p.done as f32 / p.total as f32).clamp(0.0, 1.0);
-                        ui.add(
-                            egui::ProgressBar::new(frac)
-                                .show_percentage()
-                                .desired_width(220.0),
-                        );
+        // 하단 상태바 — 별빛 상태
+        egui::TopBottomPanel::bottom("statusbar")
+            .frame(
+                egui::Frame::new()
+                    .fill(crate::ui::theme::BG_PANEL)
+                    .inner_margin(egui::Margin {
+                        left: 16,
+                        right: 16,
+                        top: 6,
+                        bottom: 6,
+                    }),
+            )
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new("✦").color(crate::ui::theme::NEBULA_LIGHT).size(12.0),
+                    );
+                    ui.label(
+                        egui::RichText::new(&self.status)
+                            .size(12.0)
+                            .color(crate::ui::theme::TEXT_DIM),
+                    );
+                    if let Some(p) = &self.progress {
+                        if p.total > 0 {
+                            let frac = (p.done as f32 / p.total as f32).clamp(0.0, 1.0);
+                            ui.add(
+                                egui::ProgressBar::new(frac)
+                                    .show_percentage()
+                                    .desired_width(220.0),
+                            );
+                        }
                     }
-                }
+                });
             });
-        });
 
         // 새 인스턴스 모달
         if self.show_new_instance {

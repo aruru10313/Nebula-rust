@@ -1,14 +1,15 @@
 use crate::ui::NebulyaApp;
+use crate::ui::theme;
 
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
-    ui.heading("설정");
+    theme::section_header(ui, "⚙", "설정", "런처를 내 별자리처럼");
     ui.add_space(8.0);
 
     crate::ui::theme::card_frame().show(ui, |ui| {
-        ui.heading("계정 (오프라인)");
+        theme::section_header(ui, "👤", "계정", "오프라인");
         ui.label(
-            egui::RichText::new("Phase 1은 오프라인 모드. MS 로그인은 Client ID 발급 후 활성화됩니다.")
+            egui::RichText::new("지금은 오프라인 모드. MS 로그인은 Client ID 발급 후 활성화됩니다.")
                 .color(crate::ui::theme::TEXT_DIM)
                 .size(12.0),
         );
@@ -28,7 +29,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(8.0);
 
     crate::ui::theme::card_frame().show(ui, |ui| {
-        ui.heading("Java & 성능");
+        theme::section_header(ui, "☕", "Java & 성능", "");
         ui.horizontal(|ui| {
             ui.label("Java 경로 (비우면 자동탐지)");
             ui.text_edit_singleline(&mut app.config.java_path);
@@ -60,7 +61,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(8.0);
 
     crate::ui::theme::card_frame().show(ui, |ui| {
-        ui.heading("모드 제공자");
+        theme::section_header(ui, "◈", "모드 제공자", "");
         ui.label(
             egui::RichText::new("Modrinth는 키 없이 사용 가능. CurseForge는 API 키가 필요합니다.")
                 .color(crate::ui::theme::TEXT_DIM)
@@ -80,7 +81,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(8.0);
 
     crate::ui::theme::card_frame().show(ui, |ui| {
-        ui.heading("Discord Activity");
+        theme::section_header(ui, "✦", "Discord Activity", "");
         ui.checkbox(&mut app.config.discord_enabled, "디스코드에 상태 표시");
         ui.horizontal(|ui| {
             ui.label("Application ID");
@@ -100,7 +101,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(8.0);
 
     crate::ui::theme::card_frame().show(ui, |ui| {
-        ui.heading("저장 위치");
+        theme::section_header(ui, "📁", "저장 위치", "");
         ui.monospace(format!("{}", app.config.game_root.display()));
         if ui.small_button("폴더 열기").clicked() {
             let _ = open::that(&app.config.game_root);

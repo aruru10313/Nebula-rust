@@ -80,7 +80,7 @@ jobs:
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: installer/windows/nebulya-setup.iss
-          options: /DBinaryDir=target\${{ matrix.target }}\release
+          options: /DBinaryDir=${{ github.workspace }}\target\${{ matrix.target }}\release
 
       - name: Collect Windows dist
         if: runner.os == 'Windows'

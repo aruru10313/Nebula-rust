@@ -152,6 +152,20 @@ fn game_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 .color(theme::TEXT_DIM)
                 .size(11.0),
         );
+        ui.horizontal(|ui| {
+            if ui.small_button("Java 21 자동 설치").clicked() {
+                app.install_java_now();
+            }
+            ui.label(
+                egui::RichText::new(if app.java_install_status.is_empty() {
+                    "Adoptium JRE를 내려받아 런처 전용으로 설치합니다"
+                } else {
+                    &app.java_install_status
+                })
+                .color(theme::TEXT_DIM)
+                .size(11.0),
+            );
+        });
         ui.add_space(4.0);
         ui.horizontal(|ui| {
             ui.label("최대 RAM (MB)");

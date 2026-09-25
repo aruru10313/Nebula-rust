@@ -53,6 +53,8 @@ pub struct NebulyaApp {
     pub update_info: Option<UpdateInfo>,
     pub update_status: String,
     update_result: Arc<Mutex<Option<Result<Option<UpdateInfo>, String>>>>,
+    pub java_install_status: String,
+    java_install_result: Arc<Mutex<Option<Result<String, String>>>>,
     pub runtime: tokio::runtime::Runtime,
     pub http: reqwest::Client,
     progress_state: Arc<Mutex<Option<LaunchProgress>>>,
@@ -100,6 +102,8 @@ impl NebulyaApp {
             update_info: None,
             update_status: String::new(),
             update_result: Arc::new(Mutex::new(None)),
+            java_install_status: String::new(),
+            java_install_result: Arc::new(Mutex::new(None)),
             runtime,
             http,
             progress_state: Arc::new(Mutex::new(None)),
@@ -250,6 +254,47 @@ impl NebulyaApp {
     pub fn cancel_ms_login(&mut self) {
         *self.login_state.lock().unwrap() = LoginState::Idle;
         self.status = "로그인 취소됨".to_string();
+    }
+
+    /// Adoptium JRE 21 자동 설치 (백그라운드, 결과는 다음 프레임에 반영)
+    pub fn install_java_now(&mut self) {
+        self.java_install_status = "Java 설치 중... (수 분 소요)".to_string();
+        let http = self.http.clone();
+        let root = self.config.game_root.clone();
+        let slot = self.java_install_result.clone();
+        std::thread::spawn(move || {
+            let res = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt
+                    .block_on(crate::minecraft::java::ensure_java_21(&http, &root))
+                    .map_err(|e| format!("설치 실패: {e:#}")),
+                Err(e) => Err(format!("런타임 오류: {e}")),
+            };
+            *slot.lock().unwrap() = Some(res);
+        });
+    }
+
+    fn poll_java_install(&mut self) {
+        let res = if let Ok(mut slot) = self.java_install_result.lock() {
+            slot.take()
+        } else {
+            None
+        };
+        if let Some(res) = res {
+            match res {
+                Ok(path) => {
+                    self.config.java_path = path.clone();
+                    self.persist();
+                    self.java_install_status = "Java 설치 완료".to_string();
+                    self.log(format!("관리 JRE 설치됨: {path}"));
+                }
+                Err(e) => {
+                    self.java_install_status = e;
+                }
+            }
+        }
     }
 
     /// 업데이트 확인 (백그라운드, 결과는 다음 프레임에 반영)
@@ -495,6 +540,8 @@ impl eframe::App for NebulyaApp {
         self.poll_login_state();
         // 업데이트 확인 결과 반영
         self.poll_update_result();
+        // Java 설치 결과 반영
+        self.poll_java_install();
         // progress 상태 동기화
         if let Ok(guard) = self.progress_state.lock() {
             if guard.is_some() {

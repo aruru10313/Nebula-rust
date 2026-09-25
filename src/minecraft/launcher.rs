@@ -223,7 +223,19 @@ pub async fn prepare_and_launch(
     // 구버전(1.13 미만 minecraftArguments 방식)은 phase 2에서 별도 처리
     let _ = &mut args;
 
-    tracing::info!("launch: {} {}", java, args.join(" "));
+    // 토큰이 로그에 남지 않게 마스킹 후 기록
+    let logged_args: Vec<String> = args
+        .iter()
+        .enumerate()
+        .map(|(i, a)| {
+            if i > 0 && args[i - 1] == "--accessToken" {
+                "***".to_string()
+            } else {
+                a.clone()
+            }
+        })
+        .collect();
+    tracing::info!("launch: {} {}", java, logged_args.join(" "));
 
     on_progress(LaunchProgress {
         step: "게임 실행 중...".into(),
@@ -239,7 +251,46 @@ pub async fn prepare_and_launch(
         .spawn()
         .with_context(|| format!("Java 실행 실패: {java}"))?;
 
-    Ok(child)
+    // 파이프가 차서 게임이 멈추지 않게 출력을 latest.log로 흘려보낸다
+    drain_child_output(child, &game_dir)
+}
+
+/// 자식 프로세스의 stdout/stderr를 `logs/latest.log`에 append하는 스레드 분리 후 반환.
+/// 로그는 실행마다 새로 쓴다.
+fn drain_child_output(
+    mut child: std::process::Child,
+    game_dir: &std::path::Path,
+) -> std::process::Child {
+    let log_path = game_dir.join("logs").join("latest.log");
+    if let Some(parent) = log_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    // 새 실행이므로 기존 로그를 비운다
+    let _ = std::fs::write(&log_path, "");
+    if let Some(out) = child.stdout.take() {
+        let path = log_path.clone();
+        std::thread::spawn(move || append_lines(out, &path));
+    }
+    if let Some(err) = child.stderr.take() {
+        let path = log_path.clone();
+        std::thread::spawn(move || append_lines(err, &path));
+    }
+    child
+}
+
+fn append_lines(pipe: impl std::io::Read + Send + 'static, path: &std::path::Path) {
+    use std::io::{BufRead, Write};
+    let reader = std::io::BufReader::new(pipe);
+    // append 모드로 열고 한 줄씩 기록 (두 스레드가 같은 파일에 씀)
+    for line in reader.lines().map_while(Result::ok) {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            let _ = writeln!(f, "{line}");
+        }
+    }
 }
 
 // ---------- helpers ----------

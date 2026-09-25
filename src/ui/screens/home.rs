@@ -195,6 +195,16 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 if theme::ghost_button(ui, "지우기").clicked() {
                     app.logs.clear();
                 }
+                let game_log = app.selected_instance().map(|inst| {
+                    inst.game_dir(&app.config.game_root)
+                        .join("logs")
+                        .join("latest.log")
+                });
+                if let Some(path) = game_log {
+                    if path.exists() && theme::ghost_button(ui, "게임 로그").clicked() {
+                        let _ = open::that(&path);
+                    }
+                }
             });
         });
         ui.add_space(4.0);

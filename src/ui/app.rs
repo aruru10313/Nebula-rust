@@ -55,6 +55,7 @@ pub struct NebulyaApp {
     update_result: Arc<Mutex<Option<Result<Option<UpdateInfo>, String>>>>,
     pub java_install_status: String,
     java_install_result: Arc<Mutex<Option<Result<String, String>>>>,
+    maximized: bool,
     pub runtime: tokio::runtime::Runtime,
     pub http: reqwest::Client,
     progress_state: Arc<Mutex<Option<LaunchProgress>>>,
@@ -104,6 +105,7 @@ impl NebulyaApp {
             update_result: Arc::new(Mutex::new(None)),
             java_install_status: String::new(),
             java_install_result: Arc::new(Mutex::new(None)),
+            maximized: false,
             runtime,
             http,
             progress_state: Arc::new(Mutex::new(None)),
@@ -248,6 +250,83 @@ impl NebulyaApp {
                 *self.login_state.lock().unwrap() = LoginState::Idle;
             }
         }
+    }
+
+    /// 커스텀 타이틀바 (OS 기본 타이틀바 대신 다크 스타일)
+    fn render_titlebar(&mut self, ctx: &egui::Context) {
+        egui::TopBottomPanel::top("titlebar")
+            .frame(
+                egui::Frame::new()
+                    .fill(crate::ui::theme::BG_PANEL)
+                    .inner_margin(egui::Margin {
+                        left: 14,
+                        right: 6,
+                        top: 0,
+                        bottom: 0,
+                    }),
+            )
+            .show(ctx, |ui| {
+                let bar = ui.allocate_response(
+                    egui::vec2(ui.available_width(), 34.0),
+                    egui::Sense::click_and_drag(),
+                );
+                if bar.drag_started() {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
+                }
+                if bar.double_clicked() {
+                    self.maximized = !self.maximized;
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(self.maximized));
+                }
+                ui.scope_builder(egui::UiBuilder::new().max_rect(bar.rect), |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new("★")
+                                .size(14.0)
+                                .color(crate::ui::theme::NEBULA_LIGHT),
+                        );
+                        ui.label(
+                            egui::RichText::new("Nebulya Launcher")
+                                .size(12.0)
+                                .color(crate::ui::theme::TEXT_DIM),
+                        );
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .small_button(
+                                    egui::RichText::new("×")
+                                        .size(14.0)
+                                        .color(crate::ui::theme::TEXT_DIM),
+                                )
+                                .clicked()
+                            {
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                            }
+                            if ui
+                                .small_button(
+                                    egui::RichText::new("＋")
+                                        .size(13.0)
+                                        .color(crate::ui::theme::TEXT_DIM),
+                                )
+                                .clicked()
+                            {
+                                self.maximized = !self.maximized;
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(
+                                    self.maximized,
+                                ));
+                            }
+                            if ui
+                                .small_button(
+                                    egui::RichText::new("–")
+                                        .size(13.0)
+                                        .color(crate::ui::theme::TEXT_DIM),
+                                )
+                                .clicked()
+                            {
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+                            }
+                        });
+                    });
+                });
+            });
     }
 
     /// Microsoft 로그인 취소 (다음 폴링 사이클에서 스레드 종료)
@@ -542,6 +621,10 @@ impl eframe::App for NebulyaApp {
         self.poll_update_result();
         // Java 설치 결과 반영
         self.poll_java_install();
+
+        // 커스텀 타이틀바 (온보딩 게이트보다 먼저 렌더링)
+        self.render_titlebar(ctx);
+
         // progress 상태 동기화
         if let Ok(guard) = self.progress_state.lock() {
             if guard.is_some() {

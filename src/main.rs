@@ -22,7 +22,8 @@ fn main() -> anyhow::Result<()> {
             .with_inner_size([1180.0, 760.0])
             .with_min_inner_size([980.0, 620.0])
             .with_title("Nebulya Launcher")
-            .with_app_id("nebulya-launcher"),
+            .with_app_id("nebulya-launcher")
+            .with_decorations(false),
         ..Default::default()
     };
 

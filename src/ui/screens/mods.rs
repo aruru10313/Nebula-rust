@@ -42,7 +42,8 @@ fn provider_label(p: ModProvider) -> &'static str {
     }
 }
 
-fn format_downloads(n: f64) -> String {    if n >= 1_000_000.0 {
+fn format_downloads(n: f64) -> String {
+    if n >= 1_000_000.0 {
         format!("{:.1}M", n / 1_000_000.0)
     } else if n >= 1_000.0 {
         format!("{:.1}K", n / 1_000.0)
@@ -165,8 +166,7 @@ impl NebulyaApp {
         };
         let key = self.config.curseforge_key();
         if key.is_empty() {
-            self.mods_ui.message =
-                "CurseForge API 키가 없습니다. 설정 탭에서 입력하세요.".into();
+            self.mods_ui.message = "CurseForge API 키가 없습니다. 설정 탭에서 입력하세요.".into();
             return;
         }
         let mc = inst.minecraft_version.clone();
@@ -207,9 +207,8 @@ impl NebulyaApp {
 
     fn upsert_installed_mod(&mut self, instance_id: &str, m: InstalledMod) {
         if let Some(inst) = self.instances.iter_mut().find(|i| i.id == instance_id) {
-            inst.mods.retain(|e| {
-                !(e.source == m.source && e.project_id == m.project_id)
-            });
+            inst.mods
+                .retain(|e| !(e.source == m.source && e.project_id == m.project_id));
             inst.mods.push(m);
         }
     }
@@ -292,7 +291,14 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         }
         let searching = app.mods_ui.searching;
         ui.add_enabled_ui(!searching, |ui| {
-            if ui.button(if searching { "검색 중..." } else { "🔍 검색" }).clicked() {
+            if ui
+                .button(if searching {
+                    "검색 중..."
+                } else {
+                    "🔍 검색"
+                })
+                .clicked()
+            {
                 app.search_mods_now();
             }
         });
@@ -328,47 +334,52 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     ui.label("검색 결과가 없습니다. 검색어를 입력하고 검색하세요.");
                 } else {
                     let hits = app.mods_ui.mr_results.clone();
-                    egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
-                        for hit in hits {
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label(egui::RichText::new(&hit.title).strong());
-                                    if !hit.description.is_empty() {
+                    egui::ScrollArea::vertical()
+                        .max_height(280.0)
+                        .show(ui, |ui| {
+                            for hit in hits {
+                                ui.horizontal(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label(egui::RichText::new(&hit.title).strong());
+                                        if !hit.description.is_empty() {
+                                            ui.label(
+                                                egui::RichText::new(
+                                                    hit.description
+                                                        .chars()
+                                                        .take(90)
+                                                        .collect::<String>(),
+                                                )
+                                                .size(12.0)
+                                                .color(crate::ui::theme::TEXT_DIM),
+                                            );
+                                        }
                                         ui.label(
-                                            egui::RichText::new(
-                                                hit.description.chars().take(90).collect::<String>(),
-                                            )
-                                            .size(12.0)
+                                            egui::RichText::new(format!(
+                                                "⬇ {}",
+                                                format_downloads(hit.downloads as f64)
+                                            ))
+                                            .size(11.0)
                                             .color(crate::ui::theme::TEXT_DIM),
                                         );
-                                    }
-                                    ui.label(
-                                        egui::RichText::new(format!(
-                                            "⬇ {}",
-                                            format_downloads(hit.downloads as f64)
-                                        ))
-                                        .size(11.0)
-                                        .color(crate::ui::theme::TEXT_DIM),
+                                    });
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            let installing = app.mods_ui.installing.is_some();
+                                            let slug = hit.slug.clone();
+                                            let title = hit.title.clone();
+                                            if ui
+                                                .add_enabled(!installing, egui::Button::new("설치"))
+                                                .clicked()
+                                            {
+                                                app.install_modrinth(&slug, &title);
+                                            }
+                                        },
                                     );
                                 });
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        let installing = app.mods_ui.installing.is_some();
-                                        let slug = hit.slug.clone();
-                                        let title = hit.title.clone();
-                                        if ui
-                                            .add_enabled(!installing, egui::Button::new("설치"))
-                                            .clicked()
-                                        {
-                                            app.install_modrinth(&slug, &title);
-                                        }
-                                    },
-                                );
-                            });
-                            ui.separator();
-                        }
-                    });
+                                ui.separator();
+                            }
+                        });
                 }
             }
             ModProvider::CurseForge => {
@@ -376,47 +387,49 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     ui.label("검색 결과가 없습니다. 검색어를 입력하고 검색하세요.");
                 } else {
                     let list = app.mods_ui.cf_results.clone();
-                    egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
-                        for m in list {
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label(egui::RichText::new(&m.name).strong());
-                                    if !m.summary.is_empty() {
+                    egui::ScrollArea::vertical()
+                        .max_height(280.0)
+                        .show(ui, |ui| {
+                            for m in list {
+                                ui.horizontal(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label(egui::RichText::new(&m.name).strong());
+                                        if !m.summary.is_empty() {
+                                            ui.label(
+                                                egui::RichText::new(
+                                                    m.summary.chars().take(90).collect::<String>(),
+                                                )
+                                                .size(12.0)
+                                                .color(crate::ui::theme::TEXT_DIM),
+                                            );
+                                        }
                                         ui.label(
-                                            egui::RichText::new(
-                                                m.summary.chars().take(90).collect::<String>(),
-                                            )
-                                            .size(12.0)
+                                            egui::RichText::new(format!(
+                                                "⬇ {}",
+                                                format_downloads(m.download_count)
+                                            ))
+                                            .size(11.0)
                                             .color(crate::ui::theme::TEXT_DIM),
                                         );
-                                    }
-                                    ui.label(
-                                        egui::RichText::new(format!(
-                                            "⬇ {}",
-                                            format_downloads(m.download_count)
-                                        ))
-                                        .size(11.0)
-                                        .color(crate::ui::theme::TEXT_DIM),
+                                    });
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            let installing = app.mods_ui.installing.is_some();
+                                            let name = m.name.clone();
+                                            let id = m.id;
+                                            if ui
+                                                .add_enabled(!installing, egui::Button::new("설치"))
+                                                .clicked()
+                                            {
+                                                app.install_curseforge(id, &name);
+                                            }
+                                        },
                                     );
                                 });
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        let installing = app.mods_ui.installing.is_some();
-                                        let name = m.name.clone();
-                                        let id = m.id;
-                                        if ui
-                                            .add_enabled(!installing, egui::Button::new("설치"))
-                                            .clicked()
-                                        {
-                                            app.install_curseforge(id, &name);
-                                        }
-                                    },
-                                );
-                            });
-                            ui.separator();
-                        }
-                    });
+                                ui.separator();
+                            }
+                        });
                 }
             }
         }
@@ -453,13 +466,12 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             for (file_name, enabled) in files {
                 let meta = metas.iter().find(|m| {
                     m.file_name == file_name
-                        || m.file_name.trim_end_matches(".disabled") == file_name.trim_end_matches(".disabled")
+                        || m.file_name.trim_end_matches(".disabled")
+                            == file_name.trim_end_matches(".disabled")
                 });
                 theme::tile_frame().show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(
-                            egui::RichText::new(if enabled { "✅" } else { "⏸" }).size(16.0),
-                        );
+                        ui.label(egui::RichText::new(if enabled { "✅" } else { "⏸" }).size(16.0));
                         ui.vertical(|ui| {
                             ui.monospace(&file_name);
                             if let Some(m) = meta {

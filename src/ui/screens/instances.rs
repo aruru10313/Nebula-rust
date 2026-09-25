@@ -1,5 +1,5 @@
-use crate::ui::NebulyaApp;
 use crate::ui::theme;
+use crate::ui::NebulyaApp;
 
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);

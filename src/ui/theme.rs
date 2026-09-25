@@ -73,10 +73,7 @@ fn dark_visuals() -> Visuals {
     v.widgets.open.bg_fill = BG_CARD;
 
     // 위젯 테두리에 별빛 실선
-    let star_stroke = Stroke::new(
-        1.0_f32,
-        Color32::from_rgba_unmultiplied(160, 170, 220, 40),
-    );
+    let star_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(160, 170, 220, 40));
     v.widgets.noninteractive.bg_stroke = star_stroke;
     v.widgets.inactive.bg_stroke = star_stroke;
     v.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, NEBULA_LIGHT);
@@ -126,7 +123,10 @@ pub fn tile_frame() -> egui::Frame {
 /// 주 버튼: 성운 바이올렛
 pub fn accent_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     let btn = egui::Button::new(
-        egui::RichText::new(label).strong().color(Color32::WHITE).size(15.0),
+        egui::RichText::new(label)
+            .strong()
+            .color(Color32::WHITE)
+            .size(15.0),
     )
     .fill(NEBULA)
     .corner_radius(CornerRadius::same(12))
@@ -145,12 +145,10 @@ pub fn ghost_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
 
 /// 위험 버튼: 삭제 등
 pub fn danger_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
-    let btn = egui::Button::new(
-        egui::RichText::new(label).color(Color32::WHITE).size(13.0),
-    )
-    .fill(Color32::from_rgb(120, 40, 60))
-    .corner_radius(CornerRadius::same(10))
-    .min_size(egui::vec2(110.0, 34.0));
+    let btn = egui::Button::new(egui::RichText::new(label).color(Color32::WHITE).size(13.0))
+        .fill(Color32::from_rgb(120, 40, 60))
+        .corner_radius(CornerRadius::same(10))
+        .min_size(egui::vec2(110.0, 34.0));
     ui.add(btn)
 }
 
@@ -180,7 +178,12 @@ pub fn star_divider(ui: &mut egui::Ui) {
 /// 작은 알약 배지 (버전/상태 표시)
 pub fn badge(ui: &mut egui::Ui, text: &str, color: Color32) {
     egui::Frame::new()
-        .fill(Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 26))
+        .fill(Color32::from_rgba_unmultiplied(
+            color.r(),
+            color.g(),
+            color.b(),
+            26,
+        ))
         .corner_radius(CornerRadius::same(20))
         .stroke(Stroke::new(
             1.0_f32,
@@ -240,7 +243,11 @@ pub fn paint_nebula(ctx: &egui::Context, rect: egui::Rect) {
         80.0,
         STAR_PINK,
     );
-    glow(egui::pos2(rect.left() + 120.0, rect.top() + 20.0), 70.0, STAR_BLUE);
+    glow(
+        egui::pos2(rect.left() + 120.0, rect.top() + 20.0),
+        70.0,
+        STAR_BLUE,
+    );
 
     // 별 (결정적 해시 배치)
     for i in 0..46u32 {
@@ -273,10 +280,7 @@ pub fn paint_nebula(ctx: &egui::Context, rect: egui::Rect) {
     painter.rect_stroke(
         rect,
         r,
-        Stroke::new(
-            1.0_f32,
-            Color32::from_rgba_unmultiplied(167, 139, 250, 70),
-        ),
+        Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(167, 139, 250, 70)),
         egui::StrokeKind::Inside,
     );
 }

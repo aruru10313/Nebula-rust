@@ -6,8 +6,8 @@
 //! - 상태: 홈 대기 / 모드 검색 / 플레이 중 / 설정 + 경과 시간 + GitHub 버튼
 
 use discord_rich_presence::{
-    DiscordIpc, DiscordIpcClient,
     activity::{Activity, Assets, Button, Timestamps},
+    DiscordIpc, DiscordIpcClient,
 };
 
 const GITHUB_URL: &str = "https://github.com/aruru10313/Nebula-rust";

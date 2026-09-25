@@ -148,7 +148,10 @@ impl Instance {
     pub fn display_version(&self) -> String {
         match self.loader {
             LoaderType::Fabric => {
-                format!("{} + Fabric {}", self.minecraft_version, self.loader_version)
+                format!(
+                    "{} + Fabric {}",
+                    self.minecraft_version, self.loader_version
+                )
             }
             LoaderType::Vanilla => self.minecraft_version.clone(),
         }

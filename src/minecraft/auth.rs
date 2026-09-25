@@ -51,7 +51,10 @@ pub enum LoginState {
     #[default]
     Idle,
     /// 브라우저에서 코드 입력 대기
-    Code { user_code: String, uri: String },
+    Code {
+        user_code: String,
+        uri: String,
+    },
     /// 승인 후 체인 진행 중 (표시용 메시지)
     Working(String),
     /// 완료 (UI가 config에 반영 후 Idle로)
@@ -127,8 +130,8 @@ pub async fn poll_device_token(
     dc: &DeviceCode,
     on_wait: impl Fn(u64),
 ) -> Result<MsTokenOk> {
-    let deadline =
-        std::time::Instant::now() + std::time::Duration::from_secs(dc.expires_in.saturating_sub(10));
+    let deadline = std::time::Instant::now()
+        + std::time::Duration::from_secs(dc.expires_in.saturating_sub(10));
     let interval = dc.interval.max(5);
     loop {
         if std::time::Instant::now() >= deadline {
@@ -138,10 +141,7 @@ pub async fn poll_device_token(
         let res = client
             .post(MS_TOKEN_URL)
             .form(&[
-                (
-                    "grant_type",
-                    "urn:ietf:params:oauth:grant-type:device_code",
-                ),
+                ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
                 ("client_id", client_id),
                 ("device_code", dc.device_code.as_str()),
             ])
@@ -151,12 +151,12 @@ pub async fn poll_device_token(
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
         if status.is_success() {
-            let ok: MsTokenOk =
-                serde_json::from_str(&body).context("MS 토큰 파싱 실패")?;
+            let ok: MsTokenOk = serde_json::from_str(&body).context("MS 토큰 파싱 실패")?;
             return Ok(ok);
         }
-        let err: TokenErr =
-            serde_json::from_str(&body).unwrap_or(TokenErr { error: "unknown".into() });
+        let err: TokenErr = serde_json::from_str(&body).unwrap_or(TokenErr {
+            error: "unknown".into(),
+        });
         match err.error.as_str() {
             "authorization_pending" => {
                 let left = deadline
@@ -204,9 +204,7 @@ pub async fn refresh_ms_token(
 
 fn require_client_id(client_id: &str) -> Result<()> {
     if client_id.trim().is_empty() {
-        anyhow::bail!(
-            "MS Client ID가 없습니다. Azure Portal에서 앱 등록 후 설정 탭에 입력하세요."
-        );
+        anyhow::bail!("MS Client ID가 없습니다. Azure Portal에서 앱 등록 후 설정 탭에 입력하세요.");
     }
     Ok(())
 }
@@ -274,10 +272,7 @@ pub async fn xbox_live_auth(
     Ok((r.token, uhs))
 }
 
-pub async fn xsts_authorize(
-    client: &reqwest::Client,
-    xbl_token: &str,
-) -> Result<(String, String)> {
+pub async fn xsts_authorize(client: &reqwest::Client, xbl_token: &str) -> Result<(String, String)> {
     let body = serde_json::json!({
         "Properties": {
             "SandboxId": "RETAIL",
@@ -296,14 +291,16 @@ pub async fn xsts_authorize(
         .context("XSTS 요청 실패")?;
     if !res.status().is_success() {
         let body = res.text().await.unwrap_or_default();
-        let xerr = serde_json::from_str::<XstsErr>(&body).ok().and_then(|e| e.xerr);
+        let xerr = serde_json::from_str::<XstsErr>(&body)
+            .ok()
+            .and_then(|e| e.xerr);
         match xerr {
             Some(code) => anyhow::bail!("{}", xerr_message(code)),
             None => anyhow::bail!("XSTS 인가 실패: {body}"),
         }
     }
-    let r: XboxResp = serde_json::from_str(&res.text().await.unwrap_or_default())
-        .context("XSTS 파싱 실패")?;
+    let r: XboxResp =
+        serde_json::from_str(&res.text().await.unwrap_or_default()).context("XSTS 파싱 실패")?;
     let uhs = r.claims.xui.first().context("XSTS uhs 없음")?.uhs.clone();
     Ok((r.token, uhs))
 }
@@ -342,10 +339,7 @@ pub async fn minecraft_login(
     Ok((r.access_token, r.expires_in))
 }
 
-pub async fn fetch_profile(
-    client: &reqwest::Client,
-    mc_token: &str,
-) -> Result<(String, String)> {
+pub async fn fetch_profile(client: &reqwest::Client, mc_token: &str) -> Result<(String, String)> {
     let r: McProfile = client
         .get("https://api.minecraftservices.com/minecraft/profile")
         .bearer_auth(mc_token)

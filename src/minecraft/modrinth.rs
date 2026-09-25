@@ -16,7 +16,9 @@ fn headers() -> reqwest::header::HeaderMap {
     let mut h = reqwest::header::HeaderMap::new();
     h.insert(
         reqwest::header::USER_AGENT,
-        reqwest::header::HeaderValue::from_static("nebulya-launcher/0.2 (github.com/aruru10313/Nebula-rust)"),
+        reqwest::header::HeaderValue::from_static(
+            "nebulya-launcher/0.2 (github.com/aruru10313/Nebula-rust)",
+        ),
     );
     h
 }
@@ -120,7 +122,10 @@ pub async fn fetch_versions(
     let res = client
         .get(format!("{API}/project/{project_id_or_slug}/version"))
         .headers(headers())
-        .query(&[("loaders", loaders.as_str()), ("game_versions", games.as_str())])
+        .query(&[
+            ("loaders", loaders.as_str()),
+            ("game_versions", games.as_str()),
+        ])
         .send()
         .await
         .context("Modrinth 버전 조회 실패")?

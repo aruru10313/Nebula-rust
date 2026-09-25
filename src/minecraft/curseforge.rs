@@ -78,9 +78,8 @@ fn key_headers(api_key: &str) -> reqwest::header::HeaderMap {
     let mut h = reqwest::header::HeaderMap::new();
     h.insert(
         "x-api-key",
-        reqwest::header::HeaderValue::from_str(api_key).unwrap_or_else(|_| {
-            reqwest::header::HeaderValue::from_static("")
-        }),
+        reqwest::header::HeaderValue::from_str(api_key)
+            .unwrap_or_else(|_| reqwest::header::HeaderValue::from_static("")),
     );
     h
 }
@@ -143,10 +142,7 @@ pub async fn fetch_files(
         .headers(key_headers(api_key))
         .query(&[
             ("gameVersion", mc_version),
-            (
-                "modLoaderType",
-                FABRIC_LOADER_TYPE.to_string().as_str(),
-            ),
+            ("modLoaderType", FABRIC_LOADER_TYPE.to_string().as_str()),
         ])
         .send()
         .await

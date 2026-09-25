@@ -182,10 +182,7 @@ pub async fn prepare_and_launch(
         .collect::<Vec<_>>()
         .join(cp_sep);
 
-    let asset_id = version_json
-        .asset_index
-        .id
-        .clone();
+    let asset_id = version_json.asset_index.id.clone();
     let assets_dir = root.join("assets");
 
     let mut args: Vec<String> = vec![
@@ -447,15 +444,13 @@ fn collect_maven_jars(root: &Path) -> Result<Vec<PathBuf>> {
 fn extract_main_class(v: &serde_json::Value) -> Option<String> {
     match v {
         serde_json::Value::String(s) => Some(s.clone()),
-        serde_json::Value::Object(map) => map
-            .get("client")
-            .and_then(|c| match c {
-                serde_json::Value::String(s) => Some(s.clone()),
-                serde_json::Value::Array(arr) => {
-                    arr.first().and_then(|x| x.as_str()).map(|s| s.to_string())
-                }
-                _ => None,
-            }),
+        serde_json::Value::Object(map) => map.get("client").and_then(|c| match c {
+            serde_json::Value::String(s) => Some(s.clone()),
+            serde_json::Value::Array(arr) => {
+                arr.first().and_then(|x| x.as_str()).map(|s| s.to_string())
+            }
+            _ => None,
+        }),
         _ => None,
     }
 }
@@ -468,7 +463,11 @@ fn launcher_meta_to_libraries(v: &serde_json::Value) -> Option<Vec<Library>> {
         let arr = obj.get(key)?.as_array()?;
         for item in arr {
             let name = item.get("name")?.as_str()?.to_string();
-            let url = item.get("url")?.as_str().unwrap_or("https://maven.fabricmc.net/").to_string();
+            let url = item
+                .get("url")?
+                .as_str()
+                .unwrap_or("https://maven.fabricmc.net/")
+                .to_string();
             // maven path 유추
             let parts: Vec<&str> = name.split(':').collect();
             if parts.len() < 3 {

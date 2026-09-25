@@ -19,10 +19,7 @@ pub fn install_korean_fonts(ctx: &egui::Context) {
         KOREAN_FONT_NAME.to_owned(),
         std::sync::Arc::new(egui::FontData::from_static(korean_font_bytes())),
     );
-    for family in [
-        egui::FontFamily::Proportional,
-        egui::FontFamily::Monospace,
-    ] {
+    for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
         if let Some(list) = defs.families.get_mut(&family) {
             list.retain(|name| name != KOREAN_FONT_NAME);
             list.insert(0, KOREAN_FONT_NAME.to_owned());
@@ -36,16 +33,12 @@ pub fn install_korean_fonts(ctx: &egui::Context) {
 #[cfg(test)]
 pub const REQUIRED_CHARS: &[char] = &[
     // 구두점/선
-    '·', '—', '→', '─', '×', '…', '–', '＋',
-    // 도형/별 (네뷸랴 장식)
-    '▦', '▶', '◆', '★', '☆', '≡', '⬇', '●', '○',
-    // 상태/알림 기호
-    '☕', '⚙', '⚠', '⚪', '✅', '⏸',
-    // 이모지 (NotoEmoji 폴백 담당)
+    '·', '—', '→', '─', '×', '…', '–', '＋', // 도형/별 (네뷸랴 장식)
+    '▦', '▶', '◆', '★', '☆', '≡', '⬇', '●', '○', // 상태/알림 기호
+    '☕', '⚙', '⚠', '⚪', '✅', '⏸', // 이모지 (NotoEmoji 폴백 담당)
     '🌐', '👤', '💾', '📁', '📂', '🔍', '🔭', '🚀',
     // CJK (모드 설명 등 외부 텍스트 대비)
-    '回', '次',
-    // 한글/라틴 표본
+    '回', '次', // 한글/라틴 표본
     '한', '글', '런', '처', '깋', '뷁', '힣', '가', 'A', 'z', '0',
 ];
 
@@ -64,10 +57,7 @@ mod tests {
 
     #[test]
     fn korean_font_loads() {
-        assert!(
-            !korean_font_bytes().is_empty(),
-            "번들 한글 폰트가 비어있음"
-        );
+        assert!(!korean_font_bytes().is_empty(), "번들 한글 폰트가 비어있음");
         assert!(
             ab_glyph::FontRef::try_from_slice(korean_font_bytes()).is_ok(),
             "번들 한글 폰트 파싱 실패"
@@ -78,8 +68,7 @@ mod tests {
     #[test]
     fn all_hangul_syllables_covered() {
         use ab_glyph::Font as _;
-        let face =
-            ab_glyph::FontRef::try_from_slice(korean_font_bytes()).expect("폰트 파싱 실패");
+        let face = ab_glyph::FontRef::try_from_slice(korean_font_bytes()).expect("폰트 파싱 실패");
         let mut missing = 0u32;
         for cp in 0xAC00..=0xD7A3 {
             if face.glyph_id(char::from_u32(cp).unwrap()) == ab_glyph::GlyphId(0) {
@@ -98,25 +87,15 @@ mod tests {
             KOREAN_FONT_NAME.to_owned(),
             std::sync::Arc::new(egui::FontData::from_static(korean_font_bytes())),
         );
-        for family in [
-            egui::FontFamily::Proportional,
-            egui::FontFamily::Monospace,
-        ] {
+        for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
             if let Some(list) = defs.families.get_mut(&family) {
                 list.retain(|name| name != KOREAN_FONT_NAME);
                 list.insert(0, KOREAN_FONT_NAME.to_owned());
             }
         }
 
-        for family in [
-            egui::FontFamily::Proportional,
-            egui::FontFamily::Monospace,
-        ] {
-            let chain = defs
-                .families
-                .get(&family)
-                .cloned()
-                .unwrap_or_default();
+        for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
+            let chain = defs.families.get(&family).cloned().unwrap_or_default();
             assert!(!chain.is_empty(), "{family:?} 체인이 비어있음");
             let mut missing = vec![];
             for &ch in REQUIRED_CHARS {

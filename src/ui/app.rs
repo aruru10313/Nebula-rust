@@ -1,4 +1,4 @@
-use crate::core::{Instance, LauncherConfig, instance};
+use crate::core::{instance, Instance, LauncherConfig};
 use crate::minecraft::auth::LoginState;
 use crate::minecraft::discord::DiscordPresence;
 use crate::minecraft::launcher::LaunchProgress;
@@ -142,8 +142,7 @@ impl NebulyaApp {
         }
         let client_id = self.config.ms_client_id_resolved();
         if client_id.is_empty() {
-            self.status =
-                "MS Client ID가 없습니다. Azure 앱 등록 후 입력하세요.".to_string();
+            self.status = "MS Client ID가 없습니다. Azure 앱 등록 후 입력하세요.".to_string();
             return;
         }
         let state = self.login_state.clone();
@@ -156,8 +155,7 @@ impl NebulyaApp {
             let rt = match rt {
                 Ok(rt) => rt,
                 Err(e) => {
-                    *state.lock().unwrap() =
-                        LoginState::Failed(format!("런타임 오류: {e}"));
+                    *state.lock().unwrap() = LoginState::Failed(format!("런타임 오류: {e}"));
                     return;
                 }
             };
@@ -256,8 +254,12 @@ impl NebulyaApp {
         let versions = self.runtime.block_on(async {
             match crate::minecraft::version::fetch_manifest(&http).await {
                 Ok(m) => {
-                    let mut v: Vec<String> =
-                        m.releases().into_iter().take(30).map(|e| e.id.clone()).collect();
+                    let mut v: Vec<String> = m
+                        .releases()
+                        .into_iter()
+                        .take(30)
+                        .map(|e| e.id.clone())
+                        .collect();
                     if v.is_empty() {
                         v.push("1.20.1".into());
                     }
@@ -282,7 +284,11 @@ impl NebulyaApp {
         let http = self.http.clone();
         let loaders = self.runtime.block_on(async {
             match crate::minecraft::fabric::fetch_loaders_for_game(&http, &mc).await {
-                Ok(list) => list.into_iter().take(20).map(|l| l.loader.version).collect(),
+                Ok(list) => list
+                    .into_iter()
+                    .take(20)
+                    .map(|l| l.loader.version)
+                    .collect(),
                 Err(e) => {
                     tracing::warn!("Fabric loader 목록 실패: {e:#}");
                     vec!["0.16.9".into()]
@@ -308,12 +314,14 @@ impl NebulyaApp {
         };
         let config = self.config.clone();
         // 정품 계정이 있으면 갱신 시도, 없거나 실패하면 오프라인
-        let (session, refreshed) = self.runtime.block_on(crate::minecraft::auth::ensure_session(
-            &self.http,
-            &config.ms_client_id_resolved(),
-            &config.username,
-            config.account.as_ref(),
-        ));
+        let (session, refreshed) = self
+            .runtime
+            .block_on(crate::minecraft::auth::ensure_session(
+                &self.http,
+                &config.ms_client_id_resolved(),
+                &config.username,
+                config.account.as_ref(),
+            ));
         if let Some(acc) = refreshed {
             self.config.account = Some(acc);
             self.config.username = self.config.account.as_ref().unwrap().username.clone();
@@ -325,8 +333,13 @@ impl NebulyaApp {
         }
         self.launching = true;
         self.status = format!("실행 준비 중... ({})", inst.display_version());
-        self.log(format!("▶ 실행: {} [{}]", inst.name, inst.display_version()));
-        self.discord.show_playing(&inst.name, &inst.display_version());
+        self.log(format!(
+            "▶ 실행: {} [{}]",
+            inst.name,
+            inst.display_version()
+        ));
+        self.discord
+            .show_playing(&inst.name, &inst.display_version());
 
         let progress_state = self.progress_state.clone();
         let cb = move |p: LaunchProgress| {
@@ -430,9 +443,10 @@ impl eframe::App for NebulyaApp {
                     let selected = self.tab == tab;
                     let label = format!("{}  {}", tab.icon(), tab.label());
                     let rich = if selected {
-                        egui::RichText::new(label).size(14.0).strong().color(
-                            egui::Color32::WHITE,
-                        )
+                        egui::RichText::new(label)
+                            .size(14.0)
+                            .strong()
+                            .color(egui::Color32::WHITE)
                     } else {
                         egui::RichText::new(label)
                             .size(14.0)
@@ -462,7 +476,11 @@ impl eframe::App for NebulyaApp {
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
                     ui.add_space(12.0);
                     ui.vertical_centered(|ui| {
-                        crate::ui::theme::badge(ui, "★ v0.3.0 stellar", crate::ui::theme::NEBULA_LIGHT);
+                        crate::ui::theme::badge(
+                            ui,
+                            "★ v0.3.0 stellar",
+                            crate::ui::theme::NEBULA_LIGHT,
+                        );
                     });
                     ui.add_space(6.0);
                     // 유저 카드
@@ -489,9 +507,7 @@ impl eframe::App for NebulyaApp {
                                     ("●", crate::ui::theme::WARN, "연결 대기 중")
                                 };
                                 ui.horizontal(|ui| {
-                                    ui.label(
-                                        egui::RichText::new(dot).size(11.0).color(dot_color),
-                                    );
+                                    ui.label(egui::RichText::new(dot).size(11.0).color(dot_color));
                                     ui.label(
                                         egui::RichText::new(txt)
                                             .size(11.0)
@@ -585,7 +601,9 @@ impl eframe::App for NebulyaApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(
-                        egui::RichText::new("★").color(crate::ui::theme::NEBULA_LIGHT).size(12.0),
+                        egui::RichText::new("★")
+                            .color(crate::ui::theme::NEBULA_LIGHT)
+                            .size(12.0),
                     );
                     ui.label(
                         egui::RichText::new(&self.status)

@@ -1,6 +1,6 @@
 use crate::minecraft::auth::LoginState;
-use crate::ui::NebulyaApp;
 use crate::ui::theme;
+use crate::ui::NebulyaApp;
 
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
@@ -172,9 +172,11 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             ui.text_edit_singleline(&mut app.config.curseforge_api_key);
         });
         ui.label(
-            egui::RichText::new("발급: console.curseforge.com → API Keys / 또는 환경변수 NEBULYA_CF_API_KEY")
-                .color(crate::ui::theme::TEXT_DIM)
-                .size(11.0),
+            egui::RichText::new(
+                "발급: console.curseforge.com → API Keys / 또는 환경변수 NEBULYA_CF_API_KEY",
+            )
+            .color(crate::ui::theme::TEXT_DIM)
+            .size(11.0),
         );
     });
 

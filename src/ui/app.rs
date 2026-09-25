@@ -194,7 +194,8 @@ impl NebulyaApp {
         let state = self.login_state.clone();
         let wait_secs = self.login_wait_secs.clone();
         let http = self.http.clone();
-        *self.login_state.lock().unwrap() = LoginState::Working("코드 요청 중...".into());
+        *self.login_state.lock().unwrap_or_else(|e| e.into_inner()) =
+            LoginState::Working("코드 요청 중...".into());
         std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -202,13 +203,14 @@ impl NebulyaApp {
             let rt = match rt {
                 Ok(rt) => rt,
                 Err(e) => {
-                    *state.lock().unwrap() = LoginState::Failed(format!("런타임 오류: {e}"));
+                    *state.lock().unwrap_or_else(|e| e.into_inner()) =
+                        LoginState::Failed(format!("런타임 오류: {e}"));
                     return;
                 }
             };
             rt.block_on(async {
                 let set = |s: LoginState| {
-                    *state.lock().unwrap() = s;
+                    *state.lock().unwrap_or_else(|e| e.into_inner()) = s;
                 };
                 // 1. device code
                 let dc = match crate::minecraft::auth::request_device_code(&http, &client_id).await
@@ -223,14 +225,14 @@ impl NebulyaApp {
                     user_code: dc.user_code.clone(),
                     uri: dc.verification_uri.clone(),
                 });
-                *wait_secs.lock().unwrap() = dc.expires_in;
+                *wait_secs.lock().unwrap_or_else(|e| e.into_inner()) = dc.expires_in;
                 // 2. 승인 대기 (Code 화면을 유지한 채 남은 시간만 갱신)
                 let ms = match crate::minecraft::auth::poll_device_token(
                     &http,
                     &client_id,
                     &dc,
                     |left| {
-                        *wait_secs.lock().unwrap() = left;
+                        *wait_secs.lock().unwrap_or_else(|e| e.into_inner()) = left;
                     },
                 )
                 .await
@@ -259,7 +261,11 @@ impl NebulyaApp {
 
     /// 로그인 상태 폴링 (매 프레임) — 완료/실패를 config에 반영
     fn poll_login_state(&mut self) {
-        let snapshot = self.login_state.lock().unwrap().clone();
+        let snapshot = self
+            .login_state
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         match snapshot {
             LoginState::Idle => {}
             LoginState::Code { .. } | LoginState::Working(_) => {
@@ -272,12 +278,12 @@ impl NebulyaApp {
                 self.persist();
                 self.status = format!("★ {}님, 정품 로그인 완료", acc.username);
                 self.log(format!("정품 로그인: {} ({})", acc.username, acc.uuid));
-                *self.login_state.lock().unwrap() = LoginState::Idle;
+                *self.login_state.lock().unwrap_or_else(|e| e.into_inner()) = LoginState::Idle;
             }
             LoginState::Failed(msg) => {
                 self.status = format!("로그인 실패: {msg}");
                 self.log(format!("로그인 실패: {msg}"));
-                *self.login_state.lock().unwrap() = LoginState::Idle;
+                *self.login_state.lock().unwrap_or_else(|e| e.into_inner()) = LoginState::Idle;
             }
         }
     }
@@ -361,7 +367,7 @@ impl NebulyaApp {
 
     /// Microsoft 로그인 취소 (다음 폴링 사이클에서 스레드 종료)
     pub fn cancel_ms_login(&mut self) {
-        *self.login_state.lock().unwrap() = LoginState::Idle;
+        *self.login_state.lock().unwrap_or_else(|e| e.into_inner()) = LoginState::Idle;
         self.status = "로그인 취소됨".to_string();
     }
 
@@ -381,7 +387,7 @@ impl NebulyaApp {
                     .map_err(|e| format!("설치 실패: {e:#}")),
                 Err(e) => Err(format!("런타임 오류: {e}")),
             };
-            *slot.lock().unwrap() = Some(res);
+            *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(res);
         });
     }
 
@@ -422,7 +428,7 @@ impl NebulyaApp {
                     .map_err(|e| format!("확인 실패: {e:#}")),
                 Err(e) => Err(format!("런타임 오류: {e}")),
             };
-            *slot.lock().unwrap() = Some(res);
+            *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(res);
         });
     }
 
@@ -435,19 +441,20 @@ impl NebulyaApp {
         if let Some(url) = info.setup_url.clone() {
             self.show_update_dialog = false;
             self.update_status = "설치기를 내려받는 중...".to_string();
-            *self.update_dl.lock().unwrap() = Some((0, None));
+            *self.update_dl.lock().unwrap_or_else(|e| e.into_inner()) = Some((0, None));
             let http = self.http.clone();
             let slot = self.update_result.clone();
             let dl = self.update_dl.clone();
             std::thread::spawn(move || {
                 let progress = |done: u64, total: Option<u64>| {
-                    *dl.lock().unwrap() = Some((done, total));
+                    *dl.lock().unwrap_or_else(|e| e.into_inner()) = Some((done, total));
                 };
                 match crate::minecraft::update::download_and_run_setup(&http, &url, progress) {
                     Ok(()) => std::process::exit(0),
                     Err(e) => {
-                        *dl.lock().unwrap() = None;
-                        *slot.lock().unwrap() = Some(Err(format!("업데이트 실패: {e:#}")));
+                        *dl.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                        *slot.lock().unwrap_or_else(|e| e.into_inner()) =
+                            Some(Err(format!("업데이트 실패: {e:#}")));
                     }
                 }
             });
@@ -458,7 +465,10 @@ impl NebulyaApp {
 
     /// 업데이트 다운로드 진행 상황 (바이트, 전체). 다운로드 중이 아니면 None.
     pub fn update_download_progress(&self) -> Option<(u64, Option<u64>)> {
-        self.update_dl.lock().unwrap().clone()
+        self.update_dl
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     fn poll_update_result(&mut self) {

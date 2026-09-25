@@ -173,7 +173,22 @@ pub async fn prepare_and_launch(
     download_assets(&client, root, &version_json).await?;
 
     // 6. java args 구성
-    let java = config.effective_java();
+    // Windows에서는 콘솔 창이 뜨지 않는 javaw.exe를 우선 사용
+    let java = {
+        let j = config.effective_java();
+        if cfg!(windows) {
+            let w = j
+                .strip_suffix("java.exe")
+                .map(|s| format!("{s}javaw.exe"))
+                .or_else(|| j.strip_suffix("java").map(|s| format!("{s}javaw.exe")));
+            match w {
+                Some(w) if std::path::Path::new(&w).exists() => w,
+                _ => j,
+            }
+        } else {
+            j
+        }
+    };
     let natives = natives_dir(root, &version_json.id);
     let cp_sep = if cfg!(windows) { ";" } else { ":" };
     let classpath = classpath_entries

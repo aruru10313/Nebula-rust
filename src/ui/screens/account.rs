@@ -93,7 +93,11 @@ fn login_flow(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             .size(12.0),
     );
     ui.add_space(2.0);
-    let snapshot = app.login_state.lock().unwrap().clone();
+    let snapshot = app
+        .login_state
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     match snapshot {
         LoginState::Idle => {
             if theme::accent_button(ui, "★ Microsoft 로그인").clicked() {
@@ -110,7 +114,10 @@ fn login_flow(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                         .font(egui::TextStyle::Heading)
                         .horizontal_align(egui::Align::Center),
                 );
-                let left = *app.login_wait_secs.lock().unwrap();
+                let left = *app
+                    .login_wait_secs
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
                 if left > 0 {
                     ui.label(
                         egui::RichText::new(format!("남은 시간: {left}초"))

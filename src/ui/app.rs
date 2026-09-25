@@ -63,6 +63,7 @@ pub struct NebulyaApp {
     pub show_update_dialog: bool,
     update_dl: Arc<Mutex<Option<(u64, Option<u64>)>>>,
     launch_rx: Option<std::sync::mpsc::Receiver<LaunchOutcome>>,
+    mod_task_rx: Option<std::sync::mpsc::Receiver<crate::ui::screens::mods::ModTaskOutcome>>,
     pub nebula_email: String,
     pub nebula_username: String,
     pub nebula_password: String,
@@ -128,6 +129,7 @@ impl NebulyaApp {
             show_update_dialog: false,
             update_dl: Arc::new(Mutex::new(None)),
             launch_rx: None,
+            mod_task_rx: None,
             nebula_email: String::new(),
             nebula_username: String::new(),
             nebula_password: String::new(),
@@ -816,6 +818,8 @@ impl eframe::App for NebulyaApp {
         self.poll_java_install();
         // 백그라운드 실행 결과 반영
         self.poll_launch();
+        // 백그라운드 모드 작업 결과 반영
+        self.poll_mod_tasks();
 
         // 커스텀 타이틀바 (가장 먼저 렌더링)
         self.render_titlebar(ctx);

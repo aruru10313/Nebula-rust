@@ -35,6 +35,24 @@ pub struct ModsUiState {
     pub message: String,
 }
 
+/// 백그라운드 모드 작업 결과 (검색·설치)
+pub enum ModTaskOutcome {
+    SearchDone {
+        provider: ModProvider,
+        mr: Vec<modrinth::ProjectHit>,
+        cf: Vec<curseforge::CfMod>,
+        message: String,
+    },
+    SearchFailed(String),
+    InstallDone {
+        instance_id: String,
+        installed: InstalledMod,
+        message: String,
+        log: String,
+    },
+    InstallFailed(String),
+}
+
 fn provider_label(p: ModProvider) -> &'static str {
     match p {
         ModProvider::Modrinth => "Modrinth · 키 불필요",
@@ -65,97 +83,136 @@ impl NebulyaApp {
             return;
         }
         let provider = self.mods_ui.provider;
+        if self.mod_task_rx.is_some() {
+            self.mods_ui.message = "이미 작업 중입니다. 잠시 기다리세요.".to_string();
+            return;
+        }
         self.mods_ui.searching = true;
         self.mods_ui.message = format!("{}에서 \"{query}\" 검색 중...", provider.label());
         self.discord.show_search(provider.label(), &query);
 
-        match provider {
-            ModProvider::Modrinth => {
-                let http = self.http.clone();
-                let res = self.runtime.block_on(modrinth::search_projects(
-                    &http,
-                    &query,
-                    Some(mc.as_str()),
-                    20,
-                ));
-                match res {
-                    Ok(hits) => {
-                        let n = hits.len();
-                        self.mods_ui.mr_results = hits;
-                        self.mods_ui.message = format!("Modrinth 결과 {n}개 (Fabric 전용)");
+        let http = self.http.clone();
+        let key = self.config.curseforge_key();
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.mod_task_rx = Some(rx);
+        std::thread::spawn(move || {
+            let rt = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    let _ = tx.send(ModTaskOutcome::SearchFailed(format!("런타임 오류: {e}")));
+                    return;
+                }
+            };
+            match provider {
+                ModProvider::Modrinth => {
+                    match rt.block_on(modrinth::search_projects(
+                        &http,
+                        &query,
+                        Some(mc.as_str()),
+                        20,
+                    )) {
+                        Ok(hits) => {
+                            let n = hits.len();
+                            let _ = tx.send(ModTaskOutcome::SearchDone {
+                                provider,
+                                mr: hits,
+                                cf: vec![],
+                                message: format!("Modrinth 결과 {n}개 (Fabric 전용)"),
+                            });
+                        }
+                        Err(e) => {
+                            let _ = tx.send(ModTaskOutcome::SearchFailed(format!(
+                                "Modrinth 검색 실패: {e:#}"
+                            )));
+                        }
                     }
-                    Err(e) => {
-                        self.mods_ui.message = format!("Modrinth 검색 실패: {e:#}");
-                        self.log(format!("Modrinth 검색 실패: {e:#}"));
+                }
+                ModProvider::CurseForge => {
+                    match rt.block_on(curseforge::search_mods(
+                        &http,
+                        &key,
+                        &query,
+                        Some(mc.as_str()),
+                        20,
+                    )) {
+                        Ok(list) => {
+                            let n = list.len();
+                            let _ = tx.send(ModTaskOutcome::SearchDone {
+                                provider,
+                                mr: vec![],
+                                cf: list,
+                                message: format!("CurseForge 결과 {n}개 (Fabric 전용)"),
+                            });
+                        }
+                        Err(e) => {
+                            let _ = tx.send(ModTaskOutcome::SearchFailed(format!(
+                                "CurseForge 검색 실패: {e:#}"
+                            )));
+                        }
                     }
                 }
             }
-            ModProvider::CurseForge => {
-                let key = self.config.curseforge_key();
-                let http = self.http.clone();
-                let res = self.runtime.block_on(curseforge::search_mods(
-                    &http,
-                    &key,
-                    &query,
-                    Some(mc.as_str()),
-                    20,
-                ));
-                match res {
-                    Ok(list) => {
-                        let n = list.len();
-                        self.mods_ui.cf_results = list;
-                        self.mods_ui.message = format!("CurseForge 결과 {n}개 (Fabric 전용)");
-                    }
-                    Err(e) => {
-                        self.mods_ui.message = format!("CurseForge 검색 실패: {e:#}");
-                        self.log(format!("CurseForge 검색 실패: {e:#}"));
-                    }
-                }
-            }
-        }
-        self.mods_ui.searching = false;
+        });
     }
 
-    /// Modrinth 설치 (최신 Fabric 호환 버전)
+    /// Modrinth 설치 (최신 Fabric 호환 버전, 백그라운드)
     pub fn install_modrinth(&mut self, slug: &str, title: &str) {
         let Some(inst) = self.selected_instance().cloned() else {
             self.mods_ui.message = "인스턴스를 먼저 선택하세요.".into();
             return;
         };
+        if self.mod_task_rx.is_some() {
+            self.mods_ui.message = "이미 작업 중입니다. 잠시 기다리세요.".into();
+            return;
+        }
         let mc = inst.minecraft_version.clone();
         let mods_dir = inst.mods_dir(&self.config.game_root);
-        self.mods_ui.installing = Some(title.to_string());
+        let instance_id = inst.id.clone();
+        let slug = slug.to_string();
+        let title = title.to_string();
+        self.mods_ui.installing = Some(title.clone());
         let http = self.http.clone();
-        let res = self
-            .runtime
-            .block_on(modrinth::install_latest(&http, slug, &mc, &mods_dir));
-        self.mods_ui.installing = None;
-        match res {
-            Ok((ver, path)) => {
-                let file_name = path
-                    .file_name()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                self.upsert_installed_mod(
-                    &inst.id,
-                    InstalledMod {
-                        source: ModSource::Modrinth,
-                        project_id: slug.to_string(),
-                        title: title.to_string(),
-                        file_name: file_name.clone(),
-                        version: ver.version_number.clone(),
-                        enabled: true,
-                    },
-                );
-                self.mods_ui.message = format!("설치됨: {file_name}");
-                self.log(format!("모드 설치(Modrinth): {title} {file_name}"));
-                self.persist();
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.mod_task_rx = Some(rx);
+        std::thread::spawn(move || {
+            let rt = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    let _ = tx.send(ModTaskOutcome::InstallFailed(format!("런타임 오류: {e}")));
+                    return;
+                }
+            };
+            match rt.block_on(modrinth::install_latest(&http, &slug, &mc, &mods_dir)) {
+                Ok((ver, path)) => {
+                    let file_name = path
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let _ = tx.send(ModTaskOutcome::InstallDone {
+                        instance_id,
+                        installed: InstalledMod {
+                            source: ModSource::Modrinth,
+                            project_id: slug.clone(),
+                            title: title.clone(),
+                            file_name: file_name.clone(),
+                            version: ver.version_number.clone(),
+                            enabled: true,
+                        },
+                        message: format!("설치됨: {file_name}"),
+                        log: format!("모드 설치(Modrinth): {title} {file_name}"),
+                    });
+                }
+                Err(e) => {
+                    let _ = tx.send(ModTaskOutcome::InstallFailed(format!("설치 실패: {e:#}")));
+                }
             }
-            Err(e) => {
-                self.mods_ui.message = format!("설치 실패: {e:#}");
-                self.log(format!("모드 설치 실패: {e:#}"));
-            }
-        }
+        });
     }
 
     /// CurseForge 설치 (최신 Fabric 호환 파일)
@@ -169,40 +226,56 @@ impl NebulyaApp {
             self.mods_ui.message = "CurseForge API 키가 없습니다. 설정 탭에서 입력하세요.".into();
             return;
         }
+        if self.mod_task_rx.is_some() {
+            self.mods_ui.message = "이미 작업 중입니다. 잠시 기다리세요.".into();
+            return;
+        }
         let mc = inst.minecraft_version.clone();
         let mods_dir = inst.mods_dir(&self.config.game_root);
-        self.mods_ui.installing = Some(name.to_string());
+        let instance_id = inst.id.clone();
+        let name = name.to_string();
+        self.mods_ui.installing = Some(name.clone());
         let http = self.http.clone();
-        let res = self.runtime.block_on(curseforge::install_latest(
-            &http, &key, mod_id, &mc, &mods_dir,
-        ));
-        self.mods_ui.installing = None;
-        match res {
-            Ok((file, path)) => {
-                let file_name = path
-                    .file_name()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                self.upsert_installed_mod(
-                    &inst.id,
-                    InstalledMod {
-                        source: ModSource::CurseForge,
-                        project_id: mod_id.to_string(),
-                        title: name.to_string(),
-                        file_name: file_name.clone(),
-                        version: file.display_name.clone(),
-                        enabled: true,
-                    },
-                );
-                self.mods_ui.message = format!("설치됨: {file_name}");
-                self.log(format!("모드 설치(CurseForge): {name} {file_name}"));
-                self.persist();
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.mod_task_rx = Some(rx);
+        std::thread::spawn(move || {
+            let rt = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    let _ = tx.send(ModTaskOutcome::InstallFailed(format!("런타임 오류: {e}")));
+                    return;
+                }
+            };
+            match rt.block_on(curseforge::install_latest(
+                &http, &key, mod_id, &mc, &mods_dir,
+            )) {
+                Ok((file, path)) => {
+                    let file_name = path
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let _ = tx.send(ModTaskOutcome::InstallDone {
+                        instance_id,
+                        installed: InstalledMod {
+                            source: ModSource::CurseForge,
+                            project_id: mod_id.to_string(),
+                            title: name.clone(),
+                            file_name: file_name.clone(),
+                            version: file.display_name.clone(),
+                            enabled: true,
+                        },
+                        message: format!("설치됨: {file_name}"),
+                        log: format!("모드 설치(CurseForge): {name} {file_name}"),
+                    });
+                }
+                Err(e) => {
+                    let _ = tx.send(ModTaskOutcome::InstallFailed(format!("설치 실패: {e:#}")));
+                }
             }
-            Err(e) => {
-                self.mods_ui.message = format!("설치 실패: {e:#}");
-                self.log(format!("모드 설치 실패: {e:#}"));
-            }
-        }
+        });
     }
 
     fn upsert_installed_mod(&mut self, instance_id: &str, m: InstalledMod) {
@@ -210,6 +283,59 @@ impl NebulyaApp {
             inst.mods
                 .retain(|e| !(e.source == m.source && e.project_id == m.project_id));
             inst.mods.push(m);
+        }
+    }
+
+    /// 백그라운드 모드 작업 결과 반영 (매 프레임)
+    pub fn poll_mod_tasks(&mut self) {
+        let outcome = match &self.mod_task_rx {
+            Some(rx) => match rx.try_recv() {
+                Ok(o) => Some(o),
+                Err(std::sync::mpsc::TryRecvError::Empty) => None,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    Some(ModTaskOutcome::SearchFailed("작업 스레드 종료".into()))
+                }
+            },
+            None => None,
+        };
+        let Some(outcome) = outcome else {
+            return;
+        };
+        self.mod_task_rx = None;
+        self.mods_ui.searching = false;
+        self.mods_ui.installing = None;
+        match outcome {
+            ModTaskOutcome::SearchDone {
+                provider,
+                mr,
+                cf,
+                message,
+            } => {
+                match provider {
+                    ModProvider::Modrinth => self.mods_ui.mr_results = mr,
+                    ModProvider::CurseForge => self.mods_ui.cf_results = cf,
+                }
+                self.mods_ui.message = message;
+            }
+            ModTaskOutcome::SearchFailed(e) => {
+                self.mods_ui.message = e.clone();
+                self.log(format!("모드 작업 실패: {e}"));
+            }
+            ModTaskOutcome::InstallDone {
+                instance_id,
+                installed,
+                message,
+                log,
+            } => {
+                self.upsert_installed_mod(&instance_id, installed);
+                self.mods_ui.message = message;
+                self.log(log);
+                self.persist();
+            }
+            ModTaskOutcome::InstallFailed(e) => {
+                self.mods_ui.message = e.clone();
+                self.log(format!("모드 설치 실패: {e}"));
+            }
         }
     }
 

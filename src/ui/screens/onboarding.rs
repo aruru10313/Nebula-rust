@@ -100,24 +100,6 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             });
         });
 
-        ui.add_space(8.0);
-
-        // 고급: MS Client ID 변경 (비워두면 내장 ID 사용)
-        egui::CollapsingHeader::new("고급: MS Client ID 변경").show(ui, |ui| {
-            ui.set_max_width(400.0);
-            ui.horizontal(|ui| {
-                ui.label("MS Client ID");
-                ui.add(
-                    egui::TextEdit::singleline(&mut app.config.ms_client_id).desired_width(240.0),
-                );
-            });
-            ui.label(
-                egui::RichText::new("비워두면 내장된 공용 ID로 로그인합니다")
-                    .color(theme::TEXT_DIM)
-                    .size(11.0),
-            );
-        });
-
         ui.add_space(10.0);
         theme::star_divider(ui);
         ui.add_space(6.0);

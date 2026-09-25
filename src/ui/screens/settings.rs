@@ -219,35 +219,15 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
 // ---- 4. 고급 ----
 fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
-        theme::section_header(ui, "≡", "고급", "ID · 저장 위치");
-        egui::CollapsingHeader::new("MS Client ID 변경 (보통 비워두세요)").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label("MS Client ID");
-                ui.text_edit_singleline(&mut app.config.ms_client_id);
-            });
-            ui.label(
-                egui::RichText::new(
-                    "Azure Portal → 앱 등록 → 애플리케이션(클라이언트) ID / 또는 환경변수 NEBULYA_MS_CLIENT_ID",
-                )
-                .color(theme::TEXT_DIM)
-                .size(11.0),
-            );
-            ui.label(
-                egui::RichText::new(
-                    "발급: console.curseforge.com → API Keys / 또는 환경변수 NEBULYA_CF_API_KEY",
-                )
-                .color(theme::TEXT_DIM)
-                .size(11.0),
-            );
-        });
-        ui.add_space(2.0);
+        theme::section_header(ui, "≡", "고급", "버전 · 저장 위치");
         ui.horizontal(|ui| {
             ui.label(format!("현재 버전: v{}", env!("CARGO_PKG_VERSION")));
             if ui.small_button("업데이트 확인").clicked() {
                 app.check_update_now();
             }
             if let Some(info) = app.update_info.clone() {
-                if theme::accent_button(ui, &format!("v{}로 업데이트", info.version)).clicked() {
+                if theme::accent_button(ui, &format!("v{}로 업데이트", info.version)).clicked()
+                {
                     app.apply_update();
                 }
             }

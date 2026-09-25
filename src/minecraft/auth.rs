@@ -109,14 +109,21 @@ struct TokenErr {
 
 pub async fn request_device_code(client: &reqwest::Client, client_id: &str) -> Result<DeviceCode> {
     require_client_id(client_id)?;
-    let dc = client
+    let res = client
         .post(MS_DEVICE_CODE_URL)
         .form(&[("client_id", client_id), ("scope", SCOPE)])
         .send()
         .await
-        .context("MS devicecode 요청 실패")?
-        .error_for_status()
-        .context("MS devicecode 응답 오류 (Client ID 확인)")?
+        .context("MS devicecode 요청 실패")?;
+    let status = res.status();
+    if !status.is_success() {
+        let body = res.text().await.unwrap_or_default();
+        let code = serde_json::from_str::<TokenErr>(&body)
+            .map(|e| e.error)
+            .unwrap_or_else(|_| "unknown".into());
+        anyhow::bail!("MS devicecode 거부 ({status}, {code}) — Client ID·앱 설정을 확인하세요");
+    }
+    let dc = res
         .json::<DeviceCode>()
         .await
         .context("MS devicecode 파싱 실패")?;

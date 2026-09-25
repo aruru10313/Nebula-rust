@@ -252,7 +252,7 @@ pub async fn prepare_and_launch(
         .with_context(|| format!("Java 실행 실패: {java}"))?;
 
     // 파이프가 차서 게임이 멈추지 않게 출력을 latest.log로 흘려보낸다
-    drain_child_output(child, &game_dir)
+    Ok(drain_child_output(child, &game_dir))
 }
 
 /// 자식 프로세스의 stdout/stderr를 `logs/latest.log`에 append하는 스레드 분리 후 반환.

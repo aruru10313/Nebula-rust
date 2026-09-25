@@ -142,6 +142,7 @@ jobs:
         env:
           INNO_URL: https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe
           INNO_SHA256: 9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
@@ -179,12 +180,13 @@ jobs:
           Get-ChildItem -File dist\windows | Format-Table Name, Length
 
       - name: Upload packaged files
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: nebulya-launcher-${{ matrix.artifact }}-${{ github.sha }}
           path: dist/${{ matrix.kind }}/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   release:
     name: Publish GitHub Release
@@ -194,6 +196,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      actions: write
     concurrency:
       group: release-${{ github.ref }}
       cancel-in-progress: false
@@ -269,3 +272,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.release-tag.outputs.tag }}
         run: gh release edit "$TAG" --draft=false
+
+      - name: Delete temporary build artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ids="$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" --jq '.artifacts[].id')"
+          for id in $ids; do
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$id" --silent
+          done

@@ -1,3 +1,7 @@
+//! Nebulya Launcher — Rust 기반 Fabric 마인크래프트 런처.
+//! 릴리스 빌드에서는 Windows 콘솔 창을 띄우지 않는다 (GUI 전용).
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod core;
 mod minecraft;
 mod ui;

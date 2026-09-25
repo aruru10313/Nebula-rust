@@ -4,38 +4,40 @@ use crate::ui::NebulyaApp;
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 
-    // ---- 성운 히어로 ----
+    // ---- 풀블리드 성운 히어로 ----
     let avail = ui.available_width();
-    let hero_h = 196.0;
+    let hero_h = 248.0;
     let (hero_rect, _) = ui.allocate_exact_size(egui::vec2(avail, hero_h), egui::Sense::hover());
-    theme::paint_nebula(ui.ctx(), hero_rect);
+    theme::paint_hero(ui.ctx(), hero_rect);
 
     // 히어로 위 콘텐츠 오버레이
     ui.scope_builder(
-        egui::UiBuilder::new().max_rect(hero_rect.shrink(18.0)),
+        egui::UiBuilder::new().max_rect(hero_rect.shrink(22.0)),
         |ui| {
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.label(
-                        egui::RichText::new("★ STELLAR FABRIC")
-                            .size(11.0)
-                            .color(theme::NEBULA_LIGHT),
-                    );
-                    ui.label(
-                        egui::RichText::new(format!("안녕하세요, {}님", app.config.username))
-                            .size(26.0)
-                            .strong()
-                            .color(egui::Color32::WHITE),
-                    );
+            ui.vertical_centered(|ui| {
+                ui.add_space(6.0);
+                ui.label(
+                    egui::RichText::new("★ S T E L L A R · F A B R I C")
+                        .size(12.0)
+                        .color(theme::NEBULA_LIGHT)
+                        .strong(),
+                );
+                ui.label(
+                    egui::RichText::new("NEBULYA")
+                        .size(44.0)
+                        .strong()
+                        .color(egui::Color32::WHITE),
+                );
+                ui.label(
+                    egui::RichText::new(format!("안녕하세요, {}님", app.config.username))
+                        .size(15.0)
+                        .color(theme::STARLIGHT),
+                );
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
                     if let Some(inst) = app.selected_instance().cloned() {
-                        ui.horizontal(|ui| {
-                            ui.label(
-                                egui::RichText::new(format!("◆ {}", inst.name))
-                                    .size(14.0)
-                                    .color(theme::STARLIGHT),
-                            );
-                            theme::badge(ui, &inst.display_version(), theme::STAR_BLUE);
-                        });
+                        theme::badge(ui, &format!("◆ {}", inst.name), theme::STAR_BLUE);
+                        theme::badge(ui, &inst.display_version(), theme::NEBULA_LIGHT);
                         ui.label(
                             egui::RichText::new(format!(
                                 "★ {}회 항해{}",
@@ -51,25 +53,20 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                         ui.label("인스턴스가 없습니다. 새로 만들어주세요.");
                     }
                 });
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(28.0);
-                        if theme::accent_button(ui, "▶  지금 항해").clicked() && !app.launching
-                        {
-                            app.launch();
-                        }
-                        ui.add_space(4.0);
-                        ui.label(
-                            egui::RichText::new(if app.launching {
-                                "워프 중..."
-                            } else {
-                                "fabric · Modrinth · CF"
-                            })
-                            .size(11.0)
-                            .color(theme::TEXT_DIM),
-                        );
-                    });
-                });
+                ui.add_space(10.0);
+                if theme::accent_button(
+                    ui,
+                    if app.launching {
+                        "★  워프 중..."
+                    } else {
+                        "▶  지금 항해"
+                    },
+                )
+                .clicked()
+                    && !app.launching
+                {
+                    app.launch();
+                }
             });
         },
     );

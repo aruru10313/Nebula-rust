@@ -39,6 +39,9 @@ pub struct LauncherConfig {
     /// 저장된 정품 계정 (로그인 시 생성, refresh_token으로 자동 갱신)
     #[serde(default)]
     pub account: Option<crate::minecraft::auth::StoredAccount>,
+    /// 첫 실행 온보딩(로그인 게이트) 완료 여부
+    #[serde(default)]
+    pub onboarding_done: bool,
 }
 
 fn default_true() -> bool {
@@ -62,6 +65,7 @@ impl Default for LauncherConfig {
             discord_client_id: String::new(),
             ms_client_id: String::new(),
             account: None,
+            onboarding_done: false,
         }
     }
 }

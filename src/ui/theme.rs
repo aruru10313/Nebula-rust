@@ -291,3 +291,99 @@ fn hash01(mut x: u32) -> f32 {
     x ^= x >> 15;
     (x as f32) / (u32::MAX as f32)
 }
+
+// ---- 풀블리드 홈 히어로 ----
+// paint_nebula보다 크고 깊게: 수직 그라데이션 밴드 + 대형 성운 + 별밭 + 수평선 글로우.
+pub fn paint_hero(ctx: &egui::Context, rect: egui::Rect) {
+    let painter = ctx.layer_painter(egui::LayerId::background());
+    let r = CornerRadius::same(22);
+
+    // 수직 그라데이션 (위: 심우주 → 아래: 인디고)
+    let bands = 24;
+    for i in 0..bands {
+        let t = i as f32 / bands as f32;
+        let band = egui::Rect::from_min_size(
+            egui::pos2(rect.min.x, rect.min.y + t * rect.height()),
+            egui::vec2(rect.width(), rect.height() / bands as f32 + 1.0),
+        );
+        let col = Color32::from_rgb(
+            (10.0 + t * 22.0) as u8,
+            (9.0 + t * 14.0) as u8,
+            (24.0 + t * 34.0) as u8,
+        );
+        painter.rect_filled(band, CornerRadius::ZERO, col);
+    }
+    // 둥근 외곽 마스크
+    painter.rect_stroke(
+        rect,
+        r,
+        Stroke::new(1.5_f32, Color32::from_rgba_unmultiplied(167, 139, 250, 80)),
+        egui::StrokeKind::Inside,
+    );
+
+    // 대형 성운 글로우
+    let glow = |center: egui::Pos2, radius: f32, color: Color32, peak: u8| {
+        for (i, div) in [1.0f32, 1.35, 1.8, 2.5].iter().enumerate() {
+            let a = peak.saturating_sub((i as u8).saturating_mul(8));
+            painter.circle_filled(
+                center,
+                radius / div,
+                Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), a),
+            );
+        }
+    };
+    glow(
+        egui::pos2(rect.right() - rect.width() * 0.22, rect.center().y - 8.0),
+        170.0,
+        NEBULA,
+        30,
+    );
+    glow(
+        egui::pos2(rect.right() - rect.width() * 0.42, rect.bottom() - 14.0),
+        110.0,
+        STAR_PINK,
+        26,
+    );
+    glow(
+        egui::pos2(rect.left() + rect.width() * 0.16, rect.top() + 26.0),
+        90.0,
+        STAR_BLUE,
+        24,
+    );
+
+    // 별밭 (히어로 전용, 더 촘촘하게)
+    for i in 0..90u32 {
+        let h1 = hash01(i.wrapping_mul(2654435761).wrapping_add(1237));
+        let h2 = hash01(i.wrapping_mul(40503).wrapping_add(7777));
+        let x = rect.min.x + 10.0 + h1 * (rect.width() - 20.0);
+        let y = rect.min.y + 10.0 + h2 * (rect.height() - 20.0);
+        let big = i % 9 == 0;
+        let a = if big { 210 } else { 80 + (h1 * 90.0) as u8 };
+        painter.circle_filled(
+            egui::pos2(x, y),
+            if big { 2.0 } else { 1.1 },
+            Color32::from_rgba_unmultiplied(235, 238, 255, a),
+        );
+        if big {
+            let c = Color32::from_rgba_unmultiplied(200, 190, 255, 130);
+            painter.line_segment(
+                [egui::pos2(x - 5.0, y), egui::pos2(x + 5.0, y)],
+                Stroke::new(1.0_f32, c),
+            );
+            painter.line_segment(
+                [egui::pos2(x, y - 5.0), egui::pos2(x, y + 5.0)],
+                Stroke::new(1.0_f32, c),
+            );
+        }
+    }
+
+    // 하단 수평선 글로우
+    painter.rect_filled(
+        egui::Rect::from_min_size(
+            egui::pos2(rect.min.x + 24.0, rect.bottom() - 3.0),
+            egui::vec2(rect.width() - 48.0, 2.0),
+        ),
+        CornerRadius::same(1),
+        Color32::from_rgba_unmultiplied(167, 139, 250, 110),
+    );
+}

@@ -221,6 +221,7 @@ impl NebulyaApp {
             LoginState::Done(acc) => {
                 self.config.username = acc.username.clone();
                 self.config.account = Some(acc.clone());
+                self.config.onboarding_done = true;
                 self.persist();
                 self.status = format!("★ {}님, 정품 로그인 완료", acc.username);
                 self.log(format!("정품 로그인: {} ({})", acc.username, acc.uuid));
@@ -238,6 +239,19 @@ impl NebulyaApp {
     pub fn cancel_ms_login(&mut self) {
         *self.login_state.lock().unwrap() = LoginState::Idle;
         self.status = "로그인 취소됨".to_string();
+    }
+
+    /// 첫 실행 온보딩이 필요한지 (계정도 없고 온보딩도 안 끝남)
+    pub fn needs_onboarding(&self) -> bool {
+        !self.config.onboarding_done && self.config.account.is_none()
+    }
+
+    /// 오프라인으로 온보딩 완료
+    pub fn complete_onboarding_offline(&mut self) {
+        self.config.onboarding_done = true;
+        self.persist();
+        self.status = format!("오프라인 모드로 시작 ({})", self.config.username);
+        self.log("오프라인 모드로 시작");
     }
 
     pub fn log(&mut self, msg: impl Into<String>) {
@@ -410,6 +424,14 @@ impl eframe::App for NebulyaApp {
             }
         }
 
+        // 첫 실행 온보딩 게이트: 로그인 전에는 다른 화면을 보여주지 않음
+        if self.needs_onboarding() {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                crate::ui::screens::onboarding::show(self, ui);
+            });
+            return;
+        }
+
         // 좌측 사이드바 — 별빛 내비게이션
         egui::SidePanel::left("sidebar")
             .exact_width(224.0)
@@ -478,12 +500,12 @@ impl eframe::App for NebulyaApp {
                     ui.vertical_centered(|ui| {
                         crate::ui::theme::badge(
                             ui,
-                            "★ v0.3.0 stellar",
+                            &format!("★ v{} stellar", env!("CARGO_PKG_VERSION")),
                             crate::ui::theme::NEBULA_LIGHT,
                         );
                     });
                     ui.add_space(6.0);
-                    // 유저 카드
+                    // 유저 카드 (계정 상태만 표시)
                     crate::ui::theme::tile_frame().show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.label(
@@ -497,23 +519,19 @@ impl eframe::App for NebulyaApp {
                                         .size(13.0)
                                         .strong(),
                                 );
-                                let (dot, dot_color, txt) = if !self.config.discord_enabled
-                                    || self.config.discord_client_id.trim().is_empty()
-                                {
-                                    ("○", crate::ui::theme::TEXT_FAINT, "Discord 꺼짐")
-                                } else if self.discord.is_connected() {
-                                    ("●", crate::ui::theme::SUCCESS, "활동 표시 중")
-                                } else {
-                                    ("●", crate::ui::theme::WARN, "연결 대기 중")
-                                };
-                                ui.horizontal(|ui| {
-                                    ui.label(egui::RichText::new(dot).size(11.0).color(dot_color));
+                                if self.config.account.is_some() {
                                     ui.label(
-                                        egui::RichText::new(txt)
+                                        egui::RichText::new("● 정품 계정")
+                                            .size(11.0)
+                                            .color(crate::ui::theme::SUCCESS),
+                                    );
+                                } else {
+                                    ui.label(
+                                        egui::RichText::new("○ 오프라인")
                                             .size(11.0)
                                             .color(crate::ui::theme::TEXT_DIM),
                                     );
-                                });
+                                }
                             });
                         });
                     });

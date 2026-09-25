@@ -50,6 +50,7 @@ pub struct NebulyaApp {
     pub mods_ui: crate::ui::screens::mods::ModsUiState,
     pub discord: DiscordPresence,
     pub login_state: Arc<Mutex<LoginState>>,
+    pub login_wait_secs: Arc<Mutex<u64>>,
     pub update_info: Option<UpdateInfo>,
     pub update_status: String,
     update_result: Arc<Mutex<Option<Result<Option<UpdateInfo>, String>>>>,
@@ -100,6 +101,7 @@ impl NebulyaApp {
             mods_ui: crate::ui::screens::mods::ModsUiState::default(),
             discord,
             login_state: Arc::new(Mutex::new(LoginState::Idle)),
+            login_wait_secs: Arc::new(Mutex::new(0)),
             update_info: None,
             update_status: String::new(),
             update_result: Arc::new(Mutex::new(None)),
@@ -163,6 +165,7 @@ impl NebulyaApp {
             return;
         }
         let state = self.login_state.clone();
+        let wait_secs = self.login_wait_secs.clone();
         let http = self.http.clone();
         *self.login_state.lock().unwrap() = LoginState::Working("코드 요청 중...".into());
         std::thread::spawn(move || {
@@ -193,14 +196,14 @@ impl NebulyaApp {
                     user_code: dc.user_code.clone(),
                     uri: dc.verification_uri.clone(),
                 });
-                // 2. 승인 대기
+                *wait_secs.lock().unwrap() = dc.expires_in;
+                // 2. 승인 대기 (Code 화면을 유지한 채 남은 시간만 갱신)
                 let ms = match crate::minecraft::auth::poll_device_token(
                     &http,
                     &client_id,
                     &dc,
                     |left| {
-                        *state.lock().unwrap() =
-                            LoginState::Working(format!("브라우저 승인 대기 중... ({left}초)"));
+                        *wait_secs.lock().unwrap() = left;
                     },
                 )
                 .await

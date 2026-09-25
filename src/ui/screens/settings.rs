@@ -100,12 +100,21 @@ fn account_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                         ui.label(
                             egui::RichText::new("브라우저에서 아래 코드를 입력하세요").strong(),
                         );
-                        ui.heading(
-                            egui::RichText::new(&user_code)
-                                .size(28.0)
-                                .strong()
-                                .color(theme::NEBULA_LIGHT),
+                        let mut code = user_code.clone();
+                        ui.add(
+                            egui::TextEdit::singleline(&mut code)
+                                .desired_width(220.0)
+                                .font(egui::TextStyle::Heading)
+                                .horizontal_align(egui::Align::Center),
                         );
+                        let left = *app.login_wait_secs.lock().unwrap();
+                        if left > 0 {
+                            ui.label(
+                                egui::RichText::new(format!("남은 시간: {left}초"))
+                                    .color(theme::TEXT_DIM)
+                                    .size(12.0),
+                            );
+                        }
                         ui.monospace(&uri);
                         ui.horizontal(|ui| {
                             if theme::accent_button(ui, "브라우저 열기").clicked() {

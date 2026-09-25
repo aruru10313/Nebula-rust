@@ -63,6 +63,7 @@ pub struct NebulyaApp {
     pub show_update_dialog: bool,
     update_dl: Arc<Mutex<Option<(u64, Option<u64>)>>>,
     launch_rx: Option<std::sync::mpsc::Receiver<LaunchOutcome>>,
+    remote_lists_rx: Option<std::sync::mpsc::Receiver<RemoteListsOutcome>>,
     mod_task_rx: Option<std::sync::mpsc::Receiver<crate::ui::screens::mods::ModTaskOutcome>>,
     pub nebula_email: String,
     pub nebula_username: String,
@@ -129,6 +130,7 @@ impl NebulyaApp {
             show_update_dialog: false,
             update_dl: Arc::new(Mutex::new(None)),
             launch_rx: None,
+            remote_lists_rx: None,
             mod_task_rx: None,
             nebula_email: String::new(),
             nebula_username: String::new(),
@@ -600,57 +602,117 @@ impl NebulyaApp {
         self.java_version_cache = crate::minecraft::java::java_version(&java).unwrap_or_default();
     }
 
-    /// Mojang/Fabric에서 버전 목록 비동기 갱신 (실패해도 기본값 유지)
+    /// Mojang 버전 목록 비동기 갱신 (시작 프리징 방지용 백그라운드)
     fn refresh_remote_lists(&mut self) {
+        if self.remote_lists_rx.is_some() {
+            return;
+        }
         let http = self.http.clone();
-        let versions = self.runtime.block_on(async {
-            match crate::minecraft::version::fetch_manifest(&http).await {
-                Ok(m) => {
-                    let mut v: Vec<String> = m
-                        .releases()
-                        .into_iter()
-                        .take(30)
-                        .map(|e| e.id.clone())
-                        .collect();
-                    if v.is_empty() {
-                        v.push("1.20.1".into());
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.remote_lists_rx = Some(rx);
+        std::thread::spawn(move || {
+            let rt = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(_) => return,
+            };
+            let versions: Vec<String> =
+                match rt.block_on(crate::minecraft::version::fetch_manifest(&http)) {
+                    Ok(m) => {
+                        let mut v: Vec<String> = m
+                            .releases()
+                            .into_iter()
+                            .take(30)
+                            .map(|e| e.id.clone())
+                            .collect();
+                        if v.is_empty() {
+                            v.push("1.20.1".into());
+                        }
+                        v
                     }
-                    v
-                }
-                Err(e) => {
-                    tracing::warn!("버전 목록 실패: {e:#}");
-                    vec!["1.20.1".into(), "1.20.4".into(), "1.21".into()]
-                }
+                    Err(e) => {
+                        tracing::warn!("버전 목록 실패: {e:#}");
+                        vec![]
+                    }
+                };
+            if !versions.is_empty() {
+                let _ = tx.send(RemoteListsOutcome::Versions(versions));
             }
         });
-        self.versions = versions;
-        if !self.versions.contains(&self.new_mc_version) {
-            if let Some(first) = self.versions.first().cloned() {
-                self.new_mc_version = first;
-            }
-        }
     }
 
+    /// Fabric 로더 목록 비동기 갱신 (백그라운드)
     fn refresh_loaders(&mut self, mc: &str) {
+        if self.remote_lists_rx.is_some() {
+            self.status = "목록을 가져오는 중입니다. 잠시 기다리세요.".to_string();
+            return;
+        }
         let mc = mc.to_string();
         let http = self.http.clone();
-        let loaders = self.runtime.block_on(async {
-            match crate::minecraft::fabric::fetch_loaders_for_game(&http, &mc).await {
-                Ok(list) => list
-                    .into_iter()
-                    .take(20)
-                    .map(|l| l.loader.version)
-                    .collect(),
+        self.status = format!("Fabric 로더 목록 조회 중... ({mc})");
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.remote_lists_rx = Some(rx);
+        std::thread::spawn(move || {
+            let rt = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(_) => return,
+            };
+            match rt.block_on(crate::minecraft::fabric::fetch_loaders_for_game(&http, &mc)) {
+                Ok(list) => {
+                    let loaders: Vec<String> = list
+                        .into_iter()
+                        .take(20)
+                        .map(|l| l.loader.version)
+                        .collect();
+                    if !loaders.is_empty() {
+                        let _ = tx.send(RemoteListsOutcome::Loaders(loaders));
+                    }
+                }
                 Err(e) => {
                     tracing::warn!("Fabric loader 목록 실패: {e:#}");
-                    vec!["0.16.9".into()]
                 }
             }
         });
-        if !loaders.is_empty() {
-            self.loaders = loaders;
-            if let Some(first) = self.loaders.first().cloned() {
-                self.new_loader_version = first;
+    }
+
+    /// 백그라운드 버전 목록 결과 반영 (매 프레임)
+    fn poll_remote_lists(&mut self) {
+        let outcome = match &self.remote_lists_rx {
+            Some(rx) => match rx.try_recv() {
+                Ok(o) => Some(o),
+                Err(std::sync::mpsc::TryRecvError::Empty) => None,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    self.remote_lists_rx = None;
+                    None
+                }
+            },
+            None => None,
+        };
+        let Some(outcome) = outcome else {
+            return;
+        };
+        self.remote_lists_rx = None;
+        match outcome {
+            RemoteListsOutcome::Versions(versions) => {
+                self.versions = versions;
+                if !self.versions.contains(&self.new_mc_version) {
+                    if let Some(first) = self.versions.first().cloned() {
+                        self.new_mc_version = first;
+                    }
+                }
+                self.status = "버전 목록 갱신됨".to_string();
+            }
+            RemoteListsOutcome::Loaders(loaders) => {
+                self.loaders = loaders;
+                if let Some(first) = self.loaders.first().cloned() {
+                    self.new_loader_version = first;
+                }
+                self.status = "Fabric 로더 목록 갱신됨".to_string();
             }
         }
     }
@@ -795,6 +857,12 @@ impl NebulyaApp {
     }
 }
 
+/// 백그라운드 버전 목록 조회 결과
+enum RemoteListsOutcome {
+    Versions(Vec<String>),
+    Loaders(Vec<String>),
+}
+
 /// 백그라운드 실행 스레드 → UI 전달용 결과
 enum LaunchOutcome {
     Done {
@@ -820,6 +888,8 @@ impl eframe::App for NebulyaApp {
         self.poll_launch();
         // 백그라운드 모드 작업 결과 반영
         self.poll_mod_tasks();
+        // 백그라운드 버전 목록 결과 반영
+        self.poll_remote_lists();
 
         // 커스텀 타이틀바 (가장 먼저 렌더링)
         self.render_titlebar(ctx);

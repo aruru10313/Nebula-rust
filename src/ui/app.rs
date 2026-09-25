@@ -676,14 +676,14 @@ impl NebulyaApp {
 
     /// 백그라운드 버전 목록 결과 반영 (매 프레임)
     fn poll_remote_lists(&mut self) {
-        let outcome = match &self.remote_lists_rx {
+        let outcome = match self.remote_lists_rx.take() {
             Some(rx) => match rx.try_recv() {
                 Ok(o) => Some(o),
-                Err(std::sync::mpsc::TryRecvError::Empty) => None,
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.remote_lists_rx = None;
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    self.remote_lists_rx = Some(rx);
                     None
                 }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => None,
             },
             None => None,
         };

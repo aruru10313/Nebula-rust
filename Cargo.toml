@@ -1,6 +1,6 @@
 [package]
 name = "nebulya-launcher"
-version = "5.6.0"
+version = "6.0.0"
 edition = "2021"
 description = "Nebulya Launcher - Rust 기반 Fabric Minecraft 런처 (Lunar/Feather/Dawn 스타일)"
 authors = ["Nebulya"]
@@ -65,6 +65,7 @@ priority = "optional"
 assets = [
   ["target/release/nebulya-launcher", "usr/bin/", "755"],
   ["README.md", "usr/share/doc/nebulya-launcher/", "644"],
+  ["LICENSE", "usr/share/doc/nebulya-launcher/", "644"],
   ["assets/nebulya-launcher.desktop", "usr/share/applications/", "644"],
 ]
 extended-description = """\

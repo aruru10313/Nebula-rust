@@ -16,11 +16,33 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if theme::accent_button(ui, "지금 업데이트").clicked() {
-                        app.apply_update();
+                        app.show_update_dialog = true;
                     }
                 });
             });
-            if !app.update_status.is_empty() {
+            if let Some((done, total)) = app.update_download_progress() {
+                ui.add_space(4.0);
+                match total {
+                    Some(t) if t > 0 => {
+                        ui.add(
+                            egui::ProgressBar::new(done as f32 / t as f32)
+                                .show_percentage()
+                                .desired_width(ui.available_width()),
+                        );
+                    }
+                    _ => {
+                        ui.add(egui::ProgressBar::new(0.0).desired_width(ui.available_width()));
+                    }
+                }
+                ui.label(
+                    egui::RichText::new(format!(
+                        "내려받는 중... {:.1} MB",
+                        done as f32 / 1_048_576.0
+                    ))
+                    .size(11.0)
+                    .color(theme::TEXT_DIM),
+                );
+            } else if !app.update_status.is_empty() {
                 ui.label(
                     egui::RichText::new(&app.update_status)
                         .size(11.0)
@@ -118,7 +140,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     theme::tile_frame()
                 };
                 let r = frame.show(ui, |ui| {
-                    ui.set_min_size(egui::vec2(210.0, 62.0));
+                    ui.set_min_size(egui::vec2(210.0, 88.0));
                     ui.label(egui::RichText::new(&inst.name).size(14.0).strong());
                     ui.label(
                         egui::RichText::new(inst.display_version())
@@ -131,14 +153,29 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                             .color(theme::NEBULA_LIGHT),
                     );
                 });
-                if ui
+                let clicked = ui
                     .interact(
                         r.response.rect,
                         egui::Id::new(("instance_card", &inst.id)),
                         egui::Sense::click(),
                     )
-                    .clicked()
-                {
+                    .clicked();
+                ui.horizontal(|ui| {
+                    if selected {
+                        theme::badge(ui, "선택됨", theme::NEBULA_LIGHT);
+                    } else if ui.small_button("선택").clicked() {
+                        app.config.selected_instance = Some(inst.id.clone());
+                        app.persist();
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.small_button("▶").clicked() && !app.launching {
+                            app.config.selected_instance = Some(inst.id.clone());
+                            app.persist();
+                            app.launch();
+                        }
+                    });
+                });
+                if clicked {
                     app.config.selected_instance = Some(inst.id.clone());
                     app.persist();
                 }

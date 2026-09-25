@@ -26,6 +26,7 @@ STAGE="$DIST/linux/${NAME}-${VERSION}-${TARGET}"
 mkdir -p "$STAGE"
 cp "$BIN" "$STAGE/"
 cp README.md "$STAGE/" 2>/dev/null || true
+cp LICENSE "$STAGE/" 2>/dev/null || true
 tar -czf "$DIST/linux/${NAME}-${VERSION}-${TARGET}.tar.gz" -C "$DIST/linux" "$(basename "$STAGE")"
 rm -rf "$STAGE"
 echo "==> tarball OK"

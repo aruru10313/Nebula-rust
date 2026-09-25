@@ -60,6 +60,8 @@ pub struct NebulyaApp {
     pub java_install_status: String,
     java_install_result: Arc<Mutex<Option<Result<String, String>>>>,
     maximized: bool,
+    pub show_update_dialog: bool,
+    update_dl: Arc<Mutex<Option<(u64, Option<u64>)>>>,
     pub runtime: tokio::runtime::Runtime,
     pub http: reqwest::Client,
     progress_state: Arc<Mutex<Option<LaunchProgress>>>,
@@ -111,6 +113,8 @@ impl NebulyaApp {
             java_install_status: String::new(),
             java_install_result: Arc::new(Mutex::new(None)),
             maximized: false,
+            show_update_dialog: false,
+            update_dl: Arc::new(Mutex::new(None)),
             runtime,
             http,
             progress_state: Arc::new(Mutex::new(None)),
@@ -409,13 +413,20 @@ impl NebulyaApp {
         };
         #[cfg(windows)]
         if let Some(url) = info.setup_url.clone() {
+            self.show_update_dialog = false;
             self.update_status = "설치기를 내려받는 중...".to_string();
+            *self.update_dl.lock().unwrap() = Some((0, None));
             let http = self.http.clone();
             let slot = self.update_result.clone();
+            let dl = self.update_dl.clone();
             std::thread::spawn(move || {
-                match crate::minecraft::update::download_and_run_setup(&http, &url) {
+                let progress = |done: u64, total: Option<u64>| {
+                    *dl.lock().unwrap() = Some((done, total));
+                };
+                match crate::minecraft::update::download_and_run_setup(&http, &url, progress) {
                     Ok(()) => std::process::exit(0),
                     Err(e) => {
+                        *dl.lock().unwrap() = None;
                         *slot.lock().unwrap() = Some(Err(format!("업데이트 실패: {e:#}")));
                     }
                 }
@@ -423,6 +434,11 @@ impl NebulyaApp {
             return;
         }
         let _ = open::that(&info.page_url);
+    }
+
+    /// 업데이트 다운로드 진행 상황 (바이트, 전체). 다운로드 중이 아니면 None.
+    pub fn update_download_progress(&self) -> Option<(u64, Option<u64>)> {
+        self.update_dl.lock().unwrap().clone()
     }
 
     fn poll_update_result(&mut self) {
@@ -914,6 +930,72 @@ impl eframe::App for NebulyaApp {
                         }
                     });
                 });
+        }
+
+        // 업데이트 확인 다이얼로그
+        if self.show_update_dialog {
+            if let Some(info) = self.update_info.clone() {
+                egui::Window::new("런처 업데이트")
+                    .collapsible(false)
+                    .resizable(false)
+                    .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                    .show(ctx, |ui| {
+                        ui.set_min_width(380.0);
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "v{} → v{}",
+                                env!("CARGO_PKG_VERSION"),
+                                info.version
+                            ))
+                            .size(18.0)
+                            .strong(),
+                        );
+                        ui.label(
+                            egui::RichText::new(
+                                "업데이트하면 설치기가 실행되고 런처가 다시 시작됩니다.",
+                            )
+                            .color(crate::ui::theme::TEXT_DIM)
+                            .size(12.0),
+                        );
+                        ui.add_space(4.0);
+                        if let Some((done, total)) = self.update_download_progress() {
+                            match total {
+                                Some(t) if t > 0 => {
+                                    ui.add(
+                                        egui::ProgressBar::new(done as f32 / t as f32)
+                                            .show_percentage(),
+                                    );
+                                }
+                                _ => {
+                                    ui.spinner();
+                                }
+                            }
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "내려받는 중... {:.1} MB",
+                                    done as f32 / 1_048_576.0
+                                ))
+                                .size(11.0)
+                                .color(crate::ui::theme::TEXT_DIM),
+                            );
+                        } else {
+                            ui.horizontal(|ui| {
+                                if crate::ui::theme::accent_button(ui, "지금 업데이트").clicked()
+                                {
+                                    self.apply_update();
+                                }
+                                if crate::ui::theme::ghost_button(ui, "나중에").clicked() {
+                                    self.show_update_dialog = false;
+                                }
+                                if ui.small_button("변경 내용 보기").clicked() {
+                                    let _ = open::that(&info.page_url);
+                                }
+                            });
+                        }
+                    });
+            } else {
+                self.show_update_dialog = false;
+            }
         }
 
         ctx.request_repaint_after(std::time::Duration::from_millis(250));

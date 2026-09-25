@@ -26,6 +26,7 @@ DefaultDirName={autopf}\Nebulya Launcher
 DefaultGroupName=Nebulya Launcher
 OutputDir=..\..\dist
 OutputBaseFilename=Nebulya-Launcher-Setup-{#MyAppVersion}
+LicenseFile=..\..\LICENSE
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -45,6 +46,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#BinaryDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

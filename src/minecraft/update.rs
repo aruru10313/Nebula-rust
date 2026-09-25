@@ -90,30 +90,51 @@ pub async fn check_for_update(
 
 /// Windows: Setup exe를 내려받아 실행하고 현재 프로세스 종료.
 /// 호출 스레드에서 블로킹으로 실행한다.
-pub fn download_and_run_setup(client: &reqwest::Client, url: &str) -> Result<()> {
+/// `on_progress(downloaded_bytes, total_bytes)`는 다운로드 진행 중에 주기적으로 호출된다.
+pub fn download_and_run_setup(
+    client: &reqwest::Client,
+    url: &str,
+    on_progress: impl Fn(u64, Option<u64>),
+) -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
     rt.block_on(async {
-        let bytes = client
+        let res = client
             .get(url)
             .header(reqwest::header::USER_AGENT, "nebulya-launcher")
             .send()
-            .await?
-            .error_for_status()?
-            .bytes()
-            .await?;
+            .await
+            .map_err(|e| anyhow::anyhow!("설치기 다운로드 요청 실패: {e:#}"))?
+            .error_for_status()
+            .map_err(|e| anyhow::anyhow!("설치기 다운로드 응답 오류: {e:#}"))?;
+        let total = res.content_length();
         let dest = std::env::temp_dir().join("Nebulya-Launcher-Setup-update.exe");
-        std::fs::write(&dest, &bytes)?;
-        Ok::<_, anyhow::Error>(dest)
-    })
-    .and_then(|dest| {
+        let mut file = std::fs::File::create(&dest)
+            .with_context(|| format!("임시 파일 생성 실패: {}", dest.display()))?;
+        {
+            use futures_util::StreamExt;
+            use std::io::Write;
+            let mut stream = res.bytes_stream();
+            let mut downloaded: u64 = 0;
+            let mut last_report: u64 = 0;
+            while let Some(chunk) = stream.next().await {
+                let chunk = chunk.map_err(|e| anyhow::anyhow!("설치기 수신 실패: {e:#}"))?;
+                file.write_all(&chunk)
+                    .map_err(|e| anyhow::anyhow!("임시 파일 기록 실패: {e}"))?;
+                downloaded += chunk.len() as u64;
+                if downloaded - last_report >= 512 * 1024 {
+                    last_report = downloaded;
+                    on_progress(downloaded, total);
+                }
+            }
+            on_progress(downloaded, total);
+        }
         std::process::Command::new(&dest)
             .spawn()
             .with_context(|| format!("설치기 실행 실패: {}", dest.display()))?;
-        Ok(dest)
-    })?;
-    Ok(())
+        Ok(())
+    })
 }
 
 #[cfg(test)]

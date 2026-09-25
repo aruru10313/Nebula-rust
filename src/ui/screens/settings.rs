@@ -138,7 +138,7 @@ fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             if let Some(info) = app.update_info.clone() {
                 if theme::accent_button(ui, &format!("v{}로 업데이트", info.version)).clicked()
                 {
-                    app.apply_update();
+                    app.show_update_dialog = true;
                 }
             }
         });

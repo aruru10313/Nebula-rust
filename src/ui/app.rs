@@ -699,14 +699,18 @@ impl NebulyaApp {
                         self.new_mc_version = first;
                     }
                 }
-                self.status = "버전 목록 갱신됨".to_string();
+                if !self.launching {
+                    self.status = "버전 목록 갱신됨".to_string();
+                }
             }
             RemoteListsOutcome::Loaders(loaders) => {
                 self.loaders = loaders;
                 if let Some(first) = self.loaders.first().cloned() {
                     self.new_loader_version = first;
                 }
-                self.status = "Fabric 로더 목록 갱신됨".to_string();
+                if !self.launching {
+                    self.status = "Fabric 로더 목록 갱신됨".to_string();
+                }
             }
         }
     }

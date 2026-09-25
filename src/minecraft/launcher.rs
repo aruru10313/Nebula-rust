@@ -409,8 +409,10 @@ async fn download_file(
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)?;
     }
+    // 임시 파일에 내려받은 뒤 해시 검증 → 원자적 교체 (중단 시 깨진 파일이 남지 않음)
+    let tmp = dest.with_extension("nebpart");
     let res = client.get(url).send().await?.error_for_status()?;
-    let mut file = tokio::fs::File::create(dest).await?;
+    let mut file = tokio::fs::File::create(&tmp).await?;
     use futures_util::StreamExt;
     let mut stream = res.bytes_stream();
     while let Some(chunk) = stream.next().await {
@@ -418,6 +420,14 @@ async fn download_file(
         file.write_all(&chunk).await?;
     }
     file.flush().await?;
+    drop(file);
+    if let Some(expected) = sha1_expected {
+        if !verify_sha1(&tmp, expected).unwrap_or(false) {
+            let _ = std::fs::remove_file(&tmp);
+            anyhow::bail!("다운로드 무결성 검증 실패: {url}");
+        }
+    }
+    std::fs::rename(&tmp, dest)?;
     Ok(())
 }
 
@@ -441,7 +451,23 @@ fn extract_natives(jar: &Path, dest: &Path) -> Result<()> {
         if name.starts_with("META-INF") || name.ends_with('/') {
             continue;
         }
-        let out = dest.join(name);
+        // Zip Slip 방지: dest 바깥으로 나가는 경로는 건너뜀
+        let out = dest.join(&name);
+        let normalized: PathBuf = out
+            .components()
+            .filter(|c| {
+                !matches!(
+                    c,
+                    std::path::Component::ParentDir
+                        | std::path::Component::Prefix(_)
+                        | std::path::Component::RootDir
+                )
+            })
+            .collect();
+        if normalized != out {
+            tracing::warn!("위험한 natives 경로 건너뜀: {name}");
+            continue;
+        }
         if let Some(parent) = out.parent() {
             std::fs::create_dir_all(parent)?;
         }

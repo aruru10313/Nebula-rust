@@ -35,7 +35,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
-Name: "korean"; MessagesFile: "compiler:Languages\\Korean.isl"
+; Inno Setup 6.7의 설치 구성에 Korean.isl이 없을 수 있으므로
+; 기본 영어만 사용한다.
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]

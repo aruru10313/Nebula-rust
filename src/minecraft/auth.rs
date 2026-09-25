@@ -337,17 +337,30 @@ pub async fn minecraft_login(
     let body = serde_json::json!({
         "identityToken": format!("XBL3.0 x={uhs};{xsts_token}"),
     });
-    let r: McLoginResp = client
+    let res = client
         .post("https://api.minecraftservices.com/authentication/login_with_xbox")
         .header("Content-Type", "application/json")
         .json(&body)
         .send()
         .await
-        .context("Minecraft 로그인 실패")?
-        .error_for_status()
-        .context("Minecraft 로그인 거부 (게임 미보유 가능)")?
-        .json()
-        .await?;
+        .context("Minecraft 로그인 실패")?;
+    if !res.status().is_success() {
+        if res.status() == reqwest::StatusCode::FORBIDDEN {
+            anyhow::bail!(
+                "앱이 Minecraft API 심사를 통과하지 못했습니다. 승인 후 다시 시도하세요."
+            );
+        }
+        let status = res.status();
+        let snippet: String = res
+            .text()
+            .await
+            .unwrap_or_default()
+            .chars()
+            .take(200)
+            .collect();
+        anyhow::bail!("Minecraft 로그인 거부 ({status}): {snippet}");
+    }
+    let r: McLoginResp = res.json().await.context("Minecraft 응답 파싱 실패")?;
     Ok((r.access_token, r.expires_in))
 }
 

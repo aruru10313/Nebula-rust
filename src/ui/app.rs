@@ -296,21 +296,24 @@ impl NebulyaApp {
     }
 
     fn poll_update_result(&mut self) {
-        if let Ok(mut slot) = self.update_result.lock() {
-            if let Some(res) = slot.take() {
-                match res {
-                    Ok(Some(info)) => {
-                        self.update_status = format!("새 버전 v{} 사용 가능", info.version);
-                        self.log(format!("업데이트 발견: v{}", info.version));
-                        self.update_info = Some(info);
-                    }
-                    Ok(None) => {
-                        self.update_info = None;
-                        self.update_status = "최신 버전입니다".to_string();
-                    }
-                    Err(e) => {
-                        self.update_status = e;
-                    }
+        let res = if let Ok(mut slot) = self.update_result.lock() {
+            slot.take()
+        } else {
+            None
+        };
+        if let Some(res) = res {
+            match res {
+                Ok(Some(info)) => {
+                    self.update_status = format!("새 버전 v{} 사용 가능", info.version);
+                    self.log(format!("업데이트 발견: v{}", info.version));
+                    self.update_info = Some(info);
+                }
+                Ok(None) => {
+                    self.update_info = None;
+                    self.update_status = "최신 버전입니다".to_string();
+                }
+                Err(e) => {
+                    self.update_status = e;
                 }
             }
         }

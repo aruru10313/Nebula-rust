@@ -8,5 +8,6 @@ pub mod java;
 pub mod launcher;
 pub mod modrinth;
 pub mod mods;
+pub mod nebula_auth;
 pub mod update;
 pub mod version;

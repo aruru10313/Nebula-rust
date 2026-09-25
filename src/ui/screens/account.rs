@@ -20,6 +20,10 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
 
     ui.add_space(8.0);
 
+    nebula_card(app, ui);
+
+    ui.add_space(8.0);
+
     theme::card_frame().show(ui, |ui| {
         ui.label(egui::RichText::new("로그인 방식").size(13.0).strong());
         ui.label(
@@ -142,4 +146,85 @@ fn login_flow(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             ui.spinner();
         }
     }
+}
+
+/// Nebulya 자체 계정 (서버 세션 방식). MS 로그인과 별개로 사용한다.
+fn nebula_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
+    theme::card_frame().show(ui, |ui| {
+        theme::section_header(ui, "★", "Nebulya 계정", "런처 자체 로그인");
+        if let Some(acc) = app.config.nebula_account.clone() {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(format!("★ {}", acc.username))
+                        .size(16.0)
+                        .strong(),
+                );
+                theme::badge(ui, "Nebulya", theme::STAR_BLUE);
+            });
+            ui.monospace(&acc.email);
+            ui.add_space(4.0);
+            if theme::danger_button(ui, "로그아웃").clicked() {
+                let http = app.http.clone();
+                let token = acc.token.clone();
+                let rt_handle = std::thread::spawn(move || {
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build();
+                    match rt {
+                        Ok(rt) => rt.block_on(crate::minecraft::nebula_auth::logout(&http, &token)),
+                        Err(e) => Err(anyhow::anyhow!("{e}")),
+                    }
+                });
+                match rt_handle.join() {
+                    Ok(Ok(())) => app.nebula_status = "로그아웃됨".to_string(),
+                    Ok(Err(e)) => {
+                        app.nebula_status = format!("서버 로그아웃 실패(로컬에서 제거): {e:#}")
+                    }
+                    Err(_) => app.nebula_status = "스레드 오류".to_string(),
+                }
+                app.config.nebula_account = None;
+                app.persist();
+            }
+        } else {
+            ui.horizontal(|ui| {
+                ui.label("이메일");
+                ui.text_edit_singleline(&mut app.nebula_email);
+            });
+            ui.horizontal(|ui| {
+                ui.label("비밀번호");
+                ui.add(egui::TextEdit::singleline(&mut app.nebula_password).password(true));
+            });
+            if app.nebula_pending_verify {
+                ui.horizontal(|ui| {
+                    ui.label("인증 코드");
+                    ui.text_edit_singleline(&mut app.nebula_code);
+                });
+            } else {
+                ui.horizontal(|ui| {
+                    ui.label("닉네임 (가입 시)");
+                    ui.text_edit_singleline(&mut app.nebula_username);
+                });
+            }
+            ui.add_space(2.0);
+            ui.horizontal(|ui| {
+                if theme::accent_button(ui, "Nebulya 로그인").clicked() {
+                    app.nebula_login();
+                }
+                if app.nebula_pending_verify {
+                    if theme::accent_button(ui, "인증 확인").clicked() {
+                        app.nebula_verify();
+                    }
+                } else if theme::ghost_button(ui, "가입하기").clicked() {
+                    app.nebula_signup();
+                }
+            });
+        }
+        if !app.nebula_status.is_empty() {
+            ui.label(
+                egui::RichText::new(&app.nebula_status)
+                    .color(theme::TEXT_DIM)
+                    .size(12.0),
+            );
+        }
+    });
 }

@@ -39,6 +39,9 @@ pub struct LauncherConfig {
     /// 저장된 정품 계정 (로그인 시 생성, refresh_token으로 자동 갱신)
     #[serde(default)]
     pub account: Option<crate::minecraft::auth::StoredAccount>,
+    /// 저장된 Nebulya 자체 계정 (서버 세션 토큰)
+    #[serde(default)]
+    pub nebula_account: Option<crate::minecraft::nebula_auth::NebulaAccount>,
     /// 첫 실행 온보딩(로그인 게이트) 완료 여부
     #[serde(default)]
     pub onboarding_done: bool,
@@ -70,6 +73,7 @@ impl Default for LauncherConfig {
             discord_client_id: String::new(),
             ms_client_id: String::new(),
             account: None,
+            nebula_account: None,
             onboarding_done: false,
         }
     }

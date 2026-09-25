@@ -114,6 +114,43 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         theme::star_divider(ui);
         ui.add_space(6.0);
 
+        // Nebulya 계정으로 계속
+        ui.label(
+            egui::RichText::new("Nebulya 계정으로 계속")
+                .strong()
+                .size(13.0),
+        );
+        ui.horizontal(|ui| {
+            ui.label("이메일");
+            ui.add(egui::TextEdit::singleline(&mut app.nebula_email).desired_width(200.0));
+        });
+        ui.horizontal(|ui| {
+            ui.label("비밀번호");
+            ui.add(
+                egui::TextEdit::singleline(&mut app.nebula_password)
+                    .password(true)
+                    .desired_width(200.0),
+            );
+        });
+        ui.horizontal(|ui| {
+            if theme::accent_button(ui, "Nebulya 로그인").clicked() {
+                app.nebula_login();
+            }
+            if theme::ghost_button(ui, "계정 만들기").clicked() {
+                app.config.onboarding_done = true;
+                app.tab = crate::ui::Tab::Account;
+                app.persist();
+            }
+        });
+        if !app.nebula_status.is_empty() {
+            ui.label(
+                egui::RichText::new(&app.nebula_status)
+                    .size(12.0)
+                    .color(theme::TEXT_DIM),
+            );
+        }
+        ui.add_space(6.0);
+
         // 정품 전용: 오프라인 시작 없음
         ui.label(
             egui::RichText::new("정품 Minecraft: Java Edition이 필요합니다")

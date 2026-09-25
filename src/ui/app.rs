@@ -63,6 +63,12 @@ pub struct NebulyaApp {
     pub show_update_dialog: bool,
     update_dl: Arc<Mutex<Option<(u64, Option<u64>)>>>,
     launch_rx: Option<std::sync::mpsc::Receiver<LaunchOutcome>>,
+    pub nebula_email: String,
+    pub nebula_username: String,
+    pub nebula_password: String,
+    pub nebula_code: String,
+    pub nebula_status: String,
+    pub nebula_pending_verify: bool,
     pub runtime: tokio::runtime::Runtime,
     pub http: reqwest::Client,
     progress_state: Arc<Mutex<Option<LaunchProgress>>>,
@@ -117,6 +123,12 @@ impl NebulyaApp {
             show_update_dialog: false,
             update_dl: Arc::new(Mutex::new(None)),
             launch_rx: None,
+            nebula_email: String::new(),
+            nebula_username: String::new(),
+            nebula_password: String::new(),
+            nebula_code: String::new(),
+            nebula_status: String::new(),
+            nebula_pending_verify: false,
             runtime,
             http,
             progress_state: Arc::new(Mutex::new(None)),
@@ -467,9 +479,95 @@ impl NebulyaApp {
         }
     }
 
-    /// 첫 실행 온보딩이 필요한지 (계정도 없고 온보딩도 안 끝남)
+    /// 첫 실행 온보딩이 필요한지 (MS·Nebulya 계정 모두 없고 온보딩도 안 끝남)
     pub fn needs_onboarding(&self) -> bool {
-        !self.config.onboarding_done && self.config.account.is_none()
+        !self.config.onboarding_done
+            && self.config.account.is_none()
+            && self.config.nebula_account.is_none()
+    }
+
+    /// Nebulya 로그인 (블로킹 join — 기존 토큰 갱신과 같은 방식)
+    pub fn nebula_login(&mut self) {
+        let http = self.http.clone();
+        let email = self.nebula_email.trim().to_string();
+        let password = self.nebula_password.clone();
+        self.nebula_password.clear();
+        let rt_handle = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build();
+            match rt {
+                Ok(rt) => rt.block_on(crate::minecraft::nebula_auth::login(
+                    &http, &email, &password,
+                )),
+                Err(e) => Err(anyhow::anyhow!("{e}")),
+            }
+        });
+        match rt_handle.join() {
+            Ok(Ok(acc)) => {
+                self.config.username = acc.username.clone();
+                self.config.nebula_account = Some(acc);
+                self.config.onboarding_done = true;
+                self.nebula_status = "Nebulya 로그인 완료".to_string();
+                self.nebula_pending_verify = false;
+                self.persist();
+            }
+            Ok(Err(e)) => self.nebula_status = format!("로그인 실패: {e:#}"),
+            Err(_) => self.nebula_status = "스레드 오류".to_string(),
+        }
+    }
+
+    /// Nebulya 회원가입 (인증 메일 발송)
+    pub fn nebula_signup(&mut self) {
+        let http = self.http.clone();
+        let email = self.nebula_email.trim().to_string();
+        let username = self.nebula_username.trim().to_string();
+        let password = self.nebula_password.clone();
+        self.nebula_password.clear();
+        let rt_handle = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build();
+            match rt {
+                Ok(rt) => rt.block_on(crate::minecraft::nebula_auth::signup(
+                    &http, &email, &username, &password,
+                )),
+                Err(e) => Err(anyhow::anyhow!("{e}")),
+            }
+        });
+        match rt_handle.join() {
+            Ok(Ok(())) => {
+                self.nebula_pending_verify = true;
+                self.nebula_status = "인증 코드를 이메일로 보냈습니다".to_string();
+            }
+            Ok(Err(e)) => self.nebula_status = format!("가입 실패: {e:#}"),
+            Err(_) => self.nebula_status = "스레드 오류".to_string(),
+        }
+    }
+
+    /// Nebulya 이메일 인증 코드 확인
+    pub fn nebula_verify(&mut self) {
+        let http = self.http.clone();
+        let email = self.nebula_email.trim().to_string();
+        let code = self.nebula_code.trim().to_string();
+        let rt_handle = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build();
+            match rt {
+                Ok(rt) => rt.block_on(crate::minecraft::nebula_auth::verify(&http, &email, &code)),
+                Err(e) => Err(anyhow::anyhow!("{e}")),
+            }
+        });
+        match rt_handle.join() {
+            Ok(Ok(())) => {
+                self.nebula_pending_verify = false;
+                self.nebula_code.clear();
+                self.nebula_status = "인증 완료 — 로그인하세요".to_string();
+            }
+            Ok(Err(e)) => self.nebula_status = format!("인증 실패: {e:#}"),
+            Err(_) => self.nebula_status = "스레드 오류".to_string(),
+        }
     }
 
     pub fn log(&mut self, msg: impl Into<String>) {
@@ -541,9 +639,9 @@ impl NebulyaApp {
         if self.launching {
             return;
         }
-        if self.config.account.is_none() {
-            self.status = "먼저 Microsoft 정품 로그인을 하세요".into();
-            self.log("실행 거부: 정품 계정 없음");
+        if self.config.account.is_none() && self.config.nebula_account.is_none() {
+            self.status = "먼저 로그인하세요 (Microsoft 또는 Nebulya)".into();
+            self.log("실행 거부: 로그인된 계정 없음");
             return;
         }
         let Some(inst) = self.selected_instance().cloned() else {
@@ -577,18 +675,32 @@ impl NebulyaApp {
                     return;
                 }
             };
-            // 정품 세션 확보 (갱신 실패 시 실행하지 않음 — 오프라인 폴백 없음)
-            let (session, refreshed) = rt.block_on(crate::minecraft::auth::ensure_session(
-                &http,
-                &config.ms_client_id_resolved(),
-                &config.username,
-                config.account.as_ref(),
-            ));
-            if session.offline {
+            // MS 계정이 있으면 정품 세션 확보, Nebulya 계정만 있으면 오프라인 세션
+            let (session, refreshed) = if let Some(ms_acc) = config.account.as_ref() {
+                let (s, r) = rt.block_on(crate::minecraft::auth::ensure_session(
+                    &http,
+                    &config.ms_client_id_resolved(),
+                    &config.username,
+                    Some(ms_acc),
+                ));
+                (s, r)
+            } else if let Some(neb) = config.nebula_account.as_ref() {
+                (
+                    crate::minecraft::auth::MinecraftSession::offline(&neb.username),
+                    None,
+                )
+            } else {
+                send(LaunchOutcome::Failed("로그인된 계정이 없습니다".into()));
+                return;
+            };
+            if session.offline && config.account.is_some() {
                 send(LaunchOutcome::Failed(
                     "정품 세션 갱신 실패 — 계정 탭에서 다시 로그인하세요".into(),
                 ));
                 return;
+            }
+            if session.offline {
+                tracing::info!("Nebulya 계정으로 오프라인 실행");
             }
             let cb = move |p: LaunchProgress| {
                 if let Ok(mut guard) = progress_state.lock() {
@@ -786,20 +898,34 @@ impl eframe::App for NebulyaApp {
                                     .color(crate::ui::theme::STAR_PINK),
                             );
                             ui.vertical(|ui| {
-                                ui.label(
-                                    egui::RichText::new(&self.config.username)
-                                        .size(13.0)
-                                        .strong(),
-                                );
+                                let display_name = self
+                                    .config
+                                    .account
+                                    .as_ref()
+                                    .map(|a| a.username.clone())
+                                    .or_else(|| {
+                                        self.config
+                                            .nebula_account
+                                            .as_ref()
+                                            .map(|a| a.username.clone())
+                                    })
+                                    .unwrap_or_else(|| self.config.username.clone());
+                                ui.label(egui::RichText::new(&display_name).size(13.0).strong());
                                 if self.config.account.is_some() {
                                     ui.label(
                                         egui::RichText::new("● 정품 계정")
                                             .size(11.0)
                                             .color(crate::ui::theme::SUCCESS),
                                     );
+                                } else if self.config.nebula_account.is_some() {
+                                    ui.label(
+                                        egui::RichText::new("● Nebulya 계정")
+                                            .size(11.0)
+                                            .color(crate::ui::theme::STAR_BLUE),
+                                    );
                                 } else {
                                     ui.label(
-                                        egui::RichText::new("○ 오프라인")
+                                        egui::RichText::new("○ 미로그인")
                                             .size(11.0)
                                             .color(crate::ui::theme::TEXT_DIM),
                                     );

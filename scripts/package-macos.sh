@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # macOS 패키징: .app 번들 + tar.gz + .dmg (dmg는 macOS에서만)
-# 사용법: ./scripts/package-macos.sh [target-triple]
-#   예) ./scripts/package-macos.sh aarch64-apple-darwin
+# 사용법: ./scripts/package-macos.sh [target-triple] [version]
+#   예) ./scripts/package-macos.sh aarch64-apple-darwin 0.3.0
 set -euo pipefail
 
 TARGET="${1:-aarch64-apple-darwin}"
-VERSION="$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)"
+REQUESTED_VERSION="${2:-}"
 NAME="nebulya-launcher"
 APP_NAME="Nebulya Launcher"
 DIST="dist"
+CARGO_VERSION="$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)"
+if [ -n "$REQUESTED_VERSION" ] && [ "$REQUESTED_VERSION" != "$CARGO_VERSION" ]; then
+  echo "버전 불일치: requested=$REQUESTED_VERSION cargo=$CARGO_VERSION" >&2
+  exit 1
+fi
+VERSION="$CARGO_VERSION"
 BIN="target/${TARGET}/release/${NAME}"
 
 echo "==> binary: $BIN (v$VERSION)"
@@ -44,14 +50,21 @@ echo "==> tarball OK"
 
 # 3) .dmg (macOS에서만)
 if [[ "$(uname)" == "Darwin" ]]; then
+  if ! command -v plutil >/dev/null 2>&1; then
+    echo "plutil이 없습니다." >&2
+    exit 1
+  fi
+  plutil -lint "$DIST/macos/${APP_NAME}.app/Contents/Info.plist"
   DMG_STAGING="$DIST/macos/dmg-staging"
   rm -rf "$DMG_STAGING" && mkdir -p "$DMG_STAGING"
   cp -R "$DIST/macos/${APP_NAME}.app" "$DMG_STAGING/"
   hdiutil create -volname "${APP_NAME}" -srcfolder "$DMG_STAGING" -ov -format UDZO \
     "$DIST/macos/${NAME}-${VERSION}-${TARGET}.dmg"
+  rm -rf "$DMG_STAGING"
   echo "==> dmg OK"
 else
   echo "==> macOS가 아니라 dmg는 건너뜀 (CI macos 러너에서 생성됨)"
 fi
 
+rm -rf "$DIST/macos/${APP_NAME}.app"
 ls -lh "$DIST/macos"

@@ -3,47 +3,106 @@ name: Build Nebulya Launcher
 on:
   push:
     branches: [main, master]
-    tags: ["v*"]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
 jobs:
-  build:
-    name: Build + Package (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    # Release 첨부용 쓰기 권한 (태그 푸시 때만 사용)
+  verify:
+    name: Verify (fmt, check, clippy, test)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxcb1-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev \
+            libwayland-dev libxkbcommon-dev libasound2-dev libssl-dev pkg-config
+
+      - name: Install Rust 1.98.1
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: 1.98.1
+          components: rustfmt, clippy
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684 # v2.8.0
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Check locked build graph
+        run: cargo check --locked --all-targets
+
+      - name: Run Clippy
+        run: cargo clippy --locked --all-targets --message-format=short
+
+      - name: Run tests
+        run: cargo test --locked
+
+  build:
+    name: Build + Package (${{ matrix.os }}/${{ matrix.target }})
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          - os: windows-2022
             target: x86_64-pc-windows-msvc
             ext: .exe
-          - os: ubuntu-latest
+            kind: windows
+            artifact: windows-x86_64
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             ext: ""
-          - os: macos-latest
+            kind: linux
+            artifact: linux-x86_64
+          - os: macos-14
             target: aarch64-apple-darwin
             ext: ""
+            kind: macos
+            artifact: macos-arm64
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          targets: ${{ matrix.target }}
+          persist-credentials: false
 
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+      - name: Read package version
+        id: package-version
+        shell: bash
+        run: |
+          version="$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Cargo.toml 버전 형식이 올바르지 않습니다: $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      # Linux eframe/egui 의존성 (X11/Wayland/glow)
-      - name: Install Linux deps
+      - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
@@ -51,52 +110,162 @@ jobs:
             libx11-dev libxcb1-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev \
             libwayland-dev libxkbcommon-dev libasound2-dev libssl-dev pkg-config
 
-      - name: Build release
-        run: cargo build --release --target ${{ matrix.target }}
-
-      # ---------- OS별 설치 파일 ----------
-      - name: Install cargo-deb (Linux)
-        if: runner.os == 'Linux'
-        run: cargo install cargo-deb
-
-      - name: Package (Linux → tar.gz + .deb)
-        if: runner.os == 'Linux'
-        run: bash scripts/package-linux.sh ${{ matrix.target }}
-
-      - name: Package (macOS → .app tar.gz + .dmg)
-        if: runner.os == 'macOS'
-        run: bash scripts/package-macos.sh ${{ matrix.target }}
-
-      - name: Build installer (Windows → Setup exe)
-        if: runner.os == 'Windows'
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+      - name: Install Rust 1.98.1
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
-          path: installer/windows/nebulya-setup.iss
-          options: /DBinaryDir=${{ github.workspace }}\target\${{ matrix.target }}\release
+          toolchain: 1.98.1
+          targets: ${{ matrix.target }}
 
-      - name: Collect Windows dist
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684 # v2.8.0
+
+      - name: Build release binary
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Install pinned cargo-deb
+        if: runner.os == 'Linux'
+        run: cargo install cargo-deb --version 3.8.0 --locked
+
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/package-linux.sh ${{ matrix.target }} ${{ steps.package-version.outputs.version }}
+
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/package-macos.sh ${{ matrix.target }} ${{ steps.package-version.outputs.version }}
+
+      - name: Install pinned Inno Setup compiler
         if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          mkdir -p dist/windows
-          cp "target/${{ matrix.target }}/release/nebulya-launcher${{ matrix.ext }}" dist/windows/
-          ls -lh dist/windows
-
-      # ---------- Release에 직접 첨부 (아티팩트 미사용 → 할당량 소모 없음) ----------
-      # 일반 푸시에서는 여기까지만 (컴파일+패키징 검증). 태그 푸시에서만 파일 첨부.
-      - name: Attach to GitHub Release (tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
+          INNO_URL: https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe
+          INNO_SHA256: 9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          Invoke-WebRequest -Uri $env:INNO_URL -OutFile $installer
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInvariant()
+          if ($actual -ne $env:INNO_SHA256.ToLowerInvariant()) {
+            throw "Inno Setup 체크섬 불일치: $actual"
+          }
+          gh release verify-asset is-6_7_3 "$installer" --repo jrsoftware/issrc
+          & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            throw "ISCC를 찾을 수 없습니다: $iscc"
+          }
+
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ steps.package-version.outputs.version }}'
+          $binary = "target\${{ matrix.target }}\release\nebulya-launcher${{ matrix.ext }}"
+          if (-not (Test-Path -LiteralPath $binary)) {
+            throw "릴리즈 바이너리를 찾을 수 없습니다: $binary"
+          }
+          New-Item -ItemType Directory -Force -Path dist\windows | Out-Null
+          Copy-Item -LiteralPath $binary -Destination "dist\windows\nebulya-launcher-$version-windows-x86_64${{ matrix.ext }}"
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          & $iscc installer\windows\nebulya-setup.iss "/DMyAppVersion=$version" "/DBinaryDir=${{ github.workspace }}\target\${{ matrix.target }}\release"
+          $setup = "dist\Nebulya-Launcher-Setup-$version.exe"
+          if (-not (Test-Path -LiteralPath $setup)) {
+            throw "Windows 설치 파일을 찾을 수 없습니다: $setup"
+          }
+          Move-Item -LiteralPath $setup -Destination "dist\windows\Nebulya-Launcher-Setup-$version-windows-x86_64.exe"
+          Get-ChildItem -File dist\windows | Format-Table Name, Length
+
+      - name: Upload packaged files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nebulya-launcher-${{ matrix.artifact }}-${{ github.sha }}
+          path: dist/${{ matrix.kind }}/
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [verify, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out tagged commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Validate release tag against Cargo.toml
+        id: release-tag
         shell: bash
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          gh release view "$TAG" >/dev/null 2>&1 \
-            || gh release create "$TAG" --generate-notes --title "$TAG" \
-            || true
-          # 파일만 첨부 (staging 디렉토리 제외, bash 3.2/macOS 호환)
-          files=$(find dist -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.dmg' -o -name '*.exe' \))
-          echo "uploading: $files"
-          # shellcheck disable=SC2086
-          gh release upload "$TAG" $files --clobber
-          echo "==> attached to release $TAG"
+          tag="${GITHUB_REF#refs/tags/}"
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "허용되지 않은 태그 형식입니다: $tag" >&2
+            exit 1
+          fi
+          version="$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)"
+          if [[ "$tag" != "v$version" ]]; then
+            echo "태그와 Cargo.toml 버전이 다릅니다: tag=$tag cargo=$version" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Download all packaged files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: nebulya-launcher-*-${{ github.sha }}
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify release assets and create checksums
+        shell: bash
+        run: |
+          find release-assets -maxdepth 1 -type f -printf '%f\n' | sort | tee release-assets/asset-list.txt
+          test "$(wc -l < release-assets/asset-list.txt | tr -d ' ')" -eq 6
+          grep -Eq '^nebulya-launcher-[0-9]+\.[0-9]+\.[0-9]+-windows-x86_64\.exe$' release-assets/asset-list.txt
+          grep -Eq '^Nebulya-Launcher-Setup-[0-9]+\.[0-9]+\.[0-9]+-windows-x86_64\.exe$' release-assets/asset-list.txt
+          grep -Eq '^nebulya-launcher-[0-9]+\.[0-9]+\.[0-9]+-x86_64-unknown-linux-gnu\.tar\.gz$' release-assets/asset-list.txt
+          grep -Eq '^nebulya-launcher_[0-9]+\.[0-9]+\.[0-9]+_x86_64-unknown-linux-gnu\.deb$' release-assets/asset-list.txt
+          grep -Eq '^nebulya-launcher-[0-9]+\.[0-9]+\.[0-9]+-aarch64-apple-darwin\.tar\.gz$' release-assets/asset-list.txt
+          grep -Eq '^nebulya-launcher-[0-9]+\.[0-9]+\.[0-9]+-aarch64-apple-darwin\.dmg$' release-assets/asset-list.txt
+          rm release-assets/asset-list.txt
+          (cd release-assets && sha256sum nebulya-launcher-* Nebulya-Launcher-Setup-* > SHA256SUMS)
+          (cd release-assets && sha256sum -c SHA256SUMS)
+          ls -lh release-assets
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2.3.3
+        with:
+          tag_name: ${{ steps.release-tag.outputs.tag }}
+          draft: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify draft release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release-tag.outputs.tag }}
+        run: |
+          gh release view "$TAG" --json assets --jq '.assets[].name' | sort | tee /tmp/release-assets.txt
+          test "$(wc -l < /tmp/release-assets.txt | tr -d ' ')" -eq 7
+          grep -Eq '^SHA256SUMS$' /tmp/release-assets.txt
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release-tag.outputs.tag }}
+        run: gh release edit "$TAG" --draft=false

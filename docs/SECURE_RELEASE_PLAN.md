@@ -20,24 +20,24 @@
 
 ## GitHub Actions
 
-- [ ] PR/push 빌드는 `contents: read`만 사용
-- [ ] `contents: write`는 태그 release job에만 부여
-- [ ] 모든 외부 Action을 full commit SHA로 고정
-- [ ] `Cargo.lock`을 커밋하여 재현 가능한 빌드 사용
-- [ ] Windows EXE/Setup, Linux tar.gz/.deb, macOS tar.gz/.dmg 생성
-- [ ] 릴리스 자산에 SHA-256 체크섬 생성
+- [x] PR/push 빌드는 `contents: read`만 사용
+- [x] `contents: write`는 태그 release job에만 부여
+- [x] 모든 외부 Action을 full commit SHA로 고정
+- [x] `Cargo.lock`을 커밋하여 재현 가능한 빌드 사용
+- [x] Windows EXE/Setup, Linux tar.gz/.deb, macOS tar.gz/.dmg 생성
+- [x] 릴리스 자산에 SHA-256 체크섬 생성
 - [ ] SBOM 및 provenance/attestation 적용 가능 여부 확인
 - [ ] Dependabot으로 Rust와 GitHub Actions 의존성 업데이트
 - [ ] PR/태그 실행에 스크립트 인젝션 방지용 환경변수 사용
 
 ## 릴리스 전 확인
 
-- [ ] `cargo fmt --check`
-- [ ] `cargo check --locked --all-targets`
-- [ ] `cargo test --locked`
+- [x] `cargo fmt --check`
+- [x] `cargo check --locked --all-targets`
+- [x] `cargo test --locked`
 - [ ] GitHub Actions의 Windows/macOS/Linux 빌드 성공
 - [ ] 설치 파일에 실행 권한 및 메타데이터가 올바른지 확인
-- [ ] 태그와 `Cargo.toml` 버전이 일치하는지 확인
+- [x] 태그와 `Cargo.toml` 버전이 일치하는지 확인
 - [ ] 공개 배포 전 Windows 코드 서명 인증서 준비
 
 ## 현재 진행 상황
@@ -45,5 +45,6 @@
 - [x] `Cargo.lock` 생성 및 추적 시작
 - [x] 로컬 저장소를 원격 브랜치에 연결
 - [ ] 인증 코드 보안 개선
-- [ ] 분리된 CI/release workflow 작성
-- [ ] GitHub Release 자동화
+- [x] 보안 CI/release workflow 코드 작성
+- [ ] GitHub Actions 실행 성공 확인
+- [ ] GitHub Release 자동화 검증

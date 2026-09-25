@@ -5,38 +5,44 @@ use crate::ui::NebulyaApp;
 /// 첫 실행 온보딩: Microsoft 정품 로그인을 먼저 요구하는 게이트 화면.
 /// 정품 로그인에 성공하면 자동으로 닫히고, 오프라인으로 시작할 수도 있다.
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
+    // 화면 전체에 성운 배경을 깔고 시작
+    let full = ui.available_rect_before_wrap();
+    theme::paint_backdrop(ui.ctx(), full);
+
     ui.vertical_centered(|ui| {
-        ui.add_space(36.0);
+        ui.add_space(30.0);
         ui.label(
             egui::RichText::new("★")
-                .size(54.0)
+                .size(60.0)
                 .color(theme::NEBULA_LIGHT),
         );
         ui.label(
             egui::RichText::new("NEBULYA")
-                .size(40.0)
+                .size(46.0)
                 .strong()
-                .color(theme::STARLIGHT),
+                .color(egui::Color32::WHITE),
         );
         ui.label(
             egui::RichText::new("S T E L L A R · F A B R I C")
                 .size(11.0)
-                .color(theme::TEXT_FAINT),
+                .color(theme::NEBULA_LIGHT),
         );
-        ui.add_space(6.0);
+        ui.add_space(4.0);
         ui.label(
             egui::RichText::new("시작하려면 Microsoft 계정으로 로그인하세요")
                 .size(15.0)
-                .color(theme::TEXT_DIM),
+                .color(theme::STARLIGHT),
         );
-        ui.add_space(18.0);
+        ui.add_space(16.0);
 
         theme::glow_card_frame().show(ui, |ui| {
-            ui.set_min_size(egui::vec2(420.0, 0.0));
+            ui.set_min_size(egui::vec2(400.0, 0.0));
+            ui.set_max_width(400.0);
             ui.vertical_centered(|ui| {
                 let snapshot = app.login_state.lock().unwrap().clone();
                 match snapshot {
                     LoginState::Idle => {
+                        ui.add_space(4.0);
                         if theme::accent_button(ui, "★ Microsoft 로그인").clicked() {
                             app.start_ms_login();
                         }
@@ -48,6 +54,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                                     .color(theme::WARN),
                             );
                         }
+                        ui.add_space(4.0);
                     }
                     LoginState::Code { user_code, uri } => {
                         ui.label(
@@ -56,48 +63,53 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                         ui.add_space(4.0);
                         ui.heading(
                             egui::RichText::new(&user_code)
-                                .size(34.0)
+                                .size(36.0)
                                 .strong()
                                 .color(theme::NEBULA_LIGHT),
                         );
                         ui.monospace(&uri);
-                        ui.add_space(6.0);
-                        ui.horizontal(|ui| {
-                            if theme::accent_button(ui, "브라우저 열기").clicked() {
-                                let _ = open::that(&uri);
-                            }
-                            if theme::ghost_button(ui, "취소").clicked() {
-                                app.cancel_ms_login();
-                            }
-                        });
-                    }
-                    LoginState::Working(msg) => {
-                        ui.horizontal(|ui| {
-                            ui.spinner();
-                            ui.label(&msg);
-                        });
+                        ui.add_space(8.0);
+                        if theme::accent_button(ui, "브라우저 열기").clicked() {
+                            let _ = open::that(&uri);
+                        }
                         ui.add_space(4.0);
                         if theme::ghost_button(ui, "취소").clicked() {
                             app.cancel_ms_login();
                         }
                     }
+                    LoginState::Working(msg) => {
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            ui.spinner();
+                            ui.label(&msg);
+                        });
+                        ui.add_space(8.0);
+                        if theme::ghost_button(ui, "취소").clicked() {
+                            app.cancel_ms_login();
+                        }
+                    }
                     LoginState::Done(_) | LoginState::Failed(_) => {
+                        ui.add_space(4.0);
                         ui.horizontal(|ui| {
                             ui.spinner();
                             ui.label("확인 중...");
                         });
+                        ui.add_space(4.0);
                     }
                 }
             });
         });
 
-        ui.add_space(10.0);
+        ui.add_space(8.0);
 
-        // 고급: MS Client ID 직접 입력 (배포 빌드는 추후 기본값 내장 예정)
+        // 고급: MS Client ID 직접 입력
         egui::CollapsingHeader::new("고급: MS Client ID 직접 입력").show(ui, |ui| {
+            ui.set_max_width(400.0);
             ui.horizontal(|ui| {
                 ui.label("MS Client ID");
-                ui.text_edit_singleline(&mut app.config.ms_client_id);
+                ui.add(
+                    egui::TextEdit::singleline(&mut app.config.ms_client_id).desired_width(240.0),
+                );
             });
             ui.label(
                 egui::RichText::new("Azure Portal → 앱 등록 → 애플리케이션(클라이언트) ID")
@@ -106,14 +118,14 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             );
         });
 
-        ui.add_space(14.0);
+        ui.add_space(10.0);
         theme::star_divider(ui);
-        ui.add_space(8.0);
+        ui.add_space(6.0);
 
         // 오프라인 시작
         ui.horizontal(|ui| {
             ui.label("닉네임");
-            ui.text_edit_singleline(&mut app.config.username);
+            ui.add(egui::TextEdit::singleline(&mut app.config.username).desired_width(200.0));
             if theme::ghost_button(ui, "오프라인으로 시작").clicked() {
                 if app.config.username.trim().is_empty() {
                     app.config.username = "Player".to_string();
@@ -126,5 +138,6 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 .color(theme::TEXT_FAINT)
                 .size(11.0),
         );
+        ui.add_space(20.0);
     });
 }

@@ -415,6 +415,8 @@ impl NebulyaApp {
 
 impl eframe::App for NebulyaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // 다크 테마 강제 (초기화 순서와 무관하게 매 프레임 보장)
+        ctx.set_visuals(crate::ui::theme::dark_visuals());
         // MS 로그인 상태 반영
         self.poll_login_state();
         // progress 상태 동기화

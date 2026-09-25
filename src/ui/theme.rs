@@ -47,7 +47,7 @@ pub fn apply_theme(ctx: &egui::Context) {
     ctx.set_style(style);
 }
 
-fn dark_visuals() -> Visuals {
+pub fn dark_visuals() -> Visuals {
     let mut v = Visuals::dark();
     v.dark_mode = true;
     v.panel_fill = BG_PANEL;
@@ -386,4 +386,84 @@ pub fn paint_hero(ctx: &egui::Context, rect: egui::Rect) {
         CornerRadius::same(1),
         Color32::from_rgba_unmultiplied(167, 139, 250, 110),
     );
+}
+
+// ---- 풀화면 배경 (테두리 없음, 온보딩/로그인 게이트용) ----
+pub fn paint_backdrop(ctx: &egui::Context, rect: egui::Rect) {
+    let painter = ctx.layer_painter(egui::LayerId::background());
+
+    // 수직 그라데이션 (위: 심우주 → 아래: 인디고)
+    let bands = 28;
+    for i in 0..bands {
+        let t = i as f32 / bands as f32;
+        let band = egui::Rect::from_min_size(
+            egui::pos2(rect.min.x, rect.min.y + t * rect.height()),
+            egui::vec2(rect.width(), rect.height() / bands as f32 + 1.0),
+        );
+        painter.rect_filled(
+            band,
+            CornerRadius::ZERO,
+            Color32::from_rgb(
+                (9.0 + t * 20.0) as u8,
+                (8.0 + t * 13.0) as u8,
+                (22.0 + t * 32.0) as u8,
+            ),
+        );
+    }
+
+    // 대형 성운 글로우
+    let glow = |center: egui::Pos2, radius: f32, color: Color32, peak: u8| {
+        for (i, div) in [1.0f32, 1.4, 1.9, 2.6].iter().enumerate() {
+            let a = peak.saturating_sub((i as u8).saturating_mul(7));
+            painter.circle_filled(
+                center,
+                radius / div,
+                Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), a),
+            );
+        }
+    };
+    glow(
+        egui::pos2(rect.center().x, rect.min.y + rect.height() * 0.24),
+        220.0,
+        NEBULA,
+        30,
+    );
+    glow(
+        egui::pos2(rect.min.x + rect.width() * 0.14, rect.bottom() - 40.0),
+        150.0,
+        STAR_PINK,
+        22,
+    );
+    glow(
+        egui::pos2(rect.right() - rect.width() * 0.14, rect.bottom() - 90.0),
+        150.0,
+        STAR_BLUE,
+        22,
+    );
+
+    // 별밭
+    for i in 0..130u32 {
+        let h1 = hash01(i.wrapping_mul(2654435761).wrapping_add(4242));
+        let h2 = hash01(i.wrapping_mul(40503).wrapping_add(1919));
+        let x = rect.min.x + 8.0 + h1 * (rect.width() - 16.0);
+        let y = rect.min.y + 8.0 + h2 * (rect.height() - 16.0);
+        let big = i % 11 == 0;
+        let a = if big { 210 } else { 80 + (h1 * 90.0) as u8 };
+        painter.circle_filled(
+            egui::pos2(x, y),
+            if big { 2.0 } else { 1.1 },
+            Color32::from_rgba_unmultiplied(235, 238, 255, a),
+        );
+        if big {
+            let c = Color32::from_rgba_unmultiplied(200, 190, 255, 130);
+            painter.line_segment(
+                [egui::pos2(x - 5.0, y), egui::pos2(x + 5.0, y)],
+                Stroke::new(1.0_f32, c),
+            );
+            painter.line_segment(
+                [egui::pos2(x, y - 5.0), egui::pos2(x, y + 5.0)],
+                Stroke::new(1.0_f32, c),
+            );
+        }
+    }
 }

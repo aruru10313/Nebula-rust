@@ -153,7 +153,7 @@ impl NebulyaApp {
         }
         let client_id = self.config.ms_client_id_resolved();
         if client_id.is_empty() {
-            self.status = "MS Client ID가 없습니다. Azure 앱 등록 후 입력하세요.".to_string();
+            self.status = "MS Client ID가 없습니다.".to_string();
             return;
         }
         let state = self.login_state.clone();

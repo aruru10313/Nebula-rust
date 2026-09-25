@@ -44,6 +44,11 @@ pub struct LauncherConfig {
     pub onboarding_done: bool,
 }
 
+/// 릴리스 빌드에 내장된 공용 MS Client ID (NOAHSOFT KOREA).
+/// Client ID는 OAuth URL에 그대로 노출되는 공개 값이므로 코드에 포함해도 된다.
+/// 사용자가 설정/환경변수로 덮어쓸 수 있다.
+pub const DEFAULT_MS_CLIENT_ID: &str = "e36da7c2-0cfc-45a6-9ba2-718fece7c46d";
+
 fn default_true() -> bool {
     true
 }
@@ -111,12 +116,17 @@ impl LauncherConfig {
         std::env::var("NEBULYA_CF_API_KEY").unwrap_or_default()
     }
 
-    /// MS Client ID (설정값 → 환경변수 순)
+    /// MS Client ID (설정값 → 환경변수 → 내장 기본값 순)
     pub fn ms_client_id_resolved(&self) -> String {
         if !self.ms_client_id.trim().is_empty() {
             return self.ms_client_id.clone();
         }
-        std::env::var("NEBULYA_MS_CLIENT_ID").unwrap_or_default()
+        if let Ok(v) = std::env::var("NEBULYA_MS_CLIENT_ID") {
+            if !v.trim().is_empty() {
+                return v;
+            }
+        }
+        DEFAULT_MS_CLIENT_ID.to_string()
     }
 }
 

@@ -220,7 +220,7 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
 fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
         theme::section_header(ui, "≡", "고급", "ID · 저장 위치");
-        egui::CollapsingHeader::new("MS Client ID 직접 입력").show(ui, |ui| {
+        egui::CollapsingHeader::new("MS Client ID 변경 (보통 비워두세요)").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("MS Client ID");
                 ui.text_edit_singleline(&mut app.config.ms_client_id);

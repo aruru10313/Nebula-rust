@@ -24,11 +24,10 @@ cargo run --release
 
 ## 정품 로그인
 
-1. [Azure Portal](https://portal.azure.com/) → 앱 등록 → 애플리케이션(클라이언트) ID 복사
-   (리디렉션 URI 불필요, Device Code 방식)
-2. 설정 탭 → MS Client ID에 붙여넣기 (또는 환경변수 `NEBULYA_MS_CLIENT_ID`)
-3. `✦ Microsoft 로그인` → 브라우저에서 코드 입력 → 완료
-4. 이후 실행 시 토큰 자동 갱신, 실패하면 오프라인으로 폴백
+1. `★ Microsoft 로그인` → 브라우저에서 코드 입력 → 완료
+2. 이후 실행 시 토큰 자동 갱신, 실패하면 에러 후 중단 (오프라인 폴백 없음)
+3. 공용 Client ID가 빌드에 내장되어 있어 별도 Azure 작업이 필요 없습니다.
+   다른 ID를 쓰려면 설정 → 고급에서 변경하거나 환경변수 `NEBULYA_MS_CLIENT_ID`를 사용하세요.
 
 ## 모드 (Fabric 전용)
 

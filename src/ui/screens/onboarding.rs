@@ -102,8 +102,8 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
 
         ui.add_space(8.0);
 
-        // 고급: MS Client ID 직접 입력
-        egui::CollapsingHeader::new("고급: MS Client ID 직접 입력").show(ui, |ui| {
+        // 고급: MS Client ID 변경 (비워두면 내장 ID 사용)
+        egui::CollapsingHeader::new("고급: MS Client ID 변경").show(ui, |ui| {
             ui.set_max_width(400.0);
             ui.horizontal(|ui| {
                 ui.label("MS Client ID");
@@ -112,7 +112,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 );
             });
             ui.label(
-                egui::RichText::new("Azure Portal → 앱 등록 → 애플리케이션(클라이언트) ID")
+                egui::RichText::new("비워두면 내장된 공용 ID로 로그인합니다")
                     .color(theme::TEXT_DIM)
                     .size(11.0),
             );

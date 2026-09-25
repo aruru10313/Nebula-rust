@@ -77,7 +77,6 @@ pub struct NebulyaApp {
     pub java_version_cache: String,
     minimize_after_launch: bool,
     pub confirm_delete_instance: Option<String>,
-    pub runtime: tokio::runtime::Runtime,
     pub http: reqwest::Client,
     progress_state: Arc<Mutex<Option<LaunchProgress>>>,
 }
@@ -88,11 +87,6 @@ impl NebulyaApp {
         crate::ui::fonts::install_korean_fonts(&cc.egui_ctx);
         let config = LauncherConfig::load();
         let instances = instance::load_instances(&config.game_root);
-
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .expect("tokio runtime");
 
         let http = reqwest::Client::builder()
             .user_agent("nebulya-launcher/0.1")
@@ -143,7 +137,6 @@ impl NebulyaApp {
             java_version_cache: String::new(),
             minimize_after_launch: false,
             confirm_delete_instance: None,
-            runtime,
             http,
             progress_state: Arc::new(Mutex::new(None)),
         };

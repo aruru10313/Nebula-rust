@@ -42,10 +42,15 @@ pub fn find_java() -> Option<String> {
 }
 
 pub fn java_version(java: &str) -> Option<String> {
-    let out = std::process::Command::new(java)
-        .arg("-version")
-        .output()
-        .ok()?;
+    let mut cmd = std::process::Command::new(java);
+    cmd.arg("-version");
+    #[cfg(windows)]
+    {
+        // 콘솔 창이 깜빡이지 않게 (CREATE_NO_WINDOW)
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let out = cmd.output().ok()?;
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
     // openjdk version "17.0.11" ... 형태에서 첫 따옴표 안 추출
     stderr

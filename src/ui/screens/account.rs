@@ -7,19 +7,10 @@ use crate::ui::NebulyaApp;
 /// 인스턴스별 게임 버전·Fabric 로더는 인스턴스 탭에서 따로 관리된다.
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
-    theme::section_header(ui, "👤", "계정", "Microsoft 정품 로그인");
+    theme::section_header(ui, "👤", "계정", "Nebulya 로그인");
     ui.add_space(8.0);
 
-    theme::card_frame().show(ui, |ui| {
-        if let Some(acc) = app.config.account.clone() {
-            account_info(app, ui, &acc);
-        } else {
-            login_flow(app, ui);
-        }
-    });
-
-    ui.add_space(8.0);
-
+    // MS 로그인은 심사 승인 후 복구 예정이라 당분간 Nebulya 계정만 노출
     nebula_card(app, ui);
 
     ui.add_space(8.0);
@@ -27,7 +18,12 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
         ui.label(egui::RichText::new("로그인 방식").size(13.0).strong());
         ui.label(
-            egui::RichText::new("Microsoft Device Code → Xbox → Minecraft 순서로 인증합니다.")
+            egui::RichText::new("Nebulya 계정으로 로그인하면 바로 플레이할 수 있습니다.")
+                .color(theme::TEXT_DIM)
+                .size(12.0),
+        );
+        ui.label(
+            egui::RichText::new("Microsoft 정품 연동은 심사 승인 후 제공됩니다.")
                 .color(theme::TEXT_DIM)
                 .size(12.0),
         );
@@ -186,6 +182,21 @@ fn nebula_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 app.persist();
             }
         } else {
+            // 로그인 / 가입하기 탭 전환
+            ui.horizontal(|ui| {
+                let login_tab = !app.nebula_mode_signup;
+                if ui.selectable_label(login_tab, "로그인").clicked() {
+                    app.nebula_mode_signup = false;
+                    app.nebula_pending_verify = false;
+                }
+                if ui
+                    .selectable_label(app.nebula_mode_signup, "가입하기")
+                    .clicked()
+                {
+                    app.nebula_mode_signup = true;
+                }
+            });
+            ui.add_space(2.0);
             ui.horizontal(|ui| {
                 ui.label("이메일");
                 ui.text_edit_singleline(&mut app.nebula_email);
@@ -194,30 +205,38 @@ fn nebula_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 ui.label("비밀번호");
                 ui.add(egui::TextEdit::singleline(&mut app.nebula_password).password(true));
             });
-            if app.nebula_pending_verify {
-                ui.horizontal(|ui| {
-                    ui.label("인증 코드");
-                    ui.text_edit_singleline(&mut app.nebula_code);
-                });
-            } else {
-                ui.horizontal(|ui| {
-                    ui.label("닉네임 (가입 시)");
-                    ui.text_edit_singleline(&mut app.nebula_username);
-                });
-            }
-            ui.add_space(2.0);
-            ui.horizontal(|ui| {
-                if theme::accent_button(ui, "Nebulya 로그인").clicked() {
-                    app.nebula_login();
-                }
+            if app.nebula_mode_signup {
                 if app.nebula_pending_verify {
-                    if theme::accent_button(ui, "인증 확인").clicked() {
-                        app.nebula_verify();
+                    ui.horizontal(|ui| {
+                        ui.label("인증 코드");
+                        ui.text_edit_singleline(&mut app.nebula_code);
+                    });
+                    ui.horizontal(|ui| {
+                        if theme::accent_button(ui, "인증 확인").clicked() {
+                            app.nebula_verify();
+                        }
+                        if ui.small_button("코드 재전송").clicked() {
+                            app.nebula_signup();
+                        }
+                    });
+                } else {
+                    ui.horizontal(|ui| {
+                        ui.label("닉네임");
+                        ui.text_edit_singleline(&mut app.nebula_username);
+                    });
+                    ui.add_space(2.0);
+                    if theme::accent_button(ui, "가입하고 코드 받기").clicked() {
+                        app.nebula_signup();
                     }
-                } else if theme::ghost_button(ui, "가입하기").clicked() {
-                    app.nebula_signup();
+                    ui.label(
+                        egui::RichText::new("비밀번호 8자 이상 · 인증 코드는 이메일로 발송됩니다")
+                            .color(theme::TEXT_FAINT)
+                            .size(11.0),
+                    );
                 }
-            });
+            } else if theme::accent_button(ui, "Nebulya 로그인").clicked() {
+                app.nebula_login();
+            }
         }
         if !app.nebula_status.is_empty() {
             ui.label(

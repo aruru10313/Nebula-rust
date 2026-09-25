@@ -32,7 +32,43 @@ pub async fn download_url_to(
     Ok(())
 }
 
-/// 모드 활성화/비활성화 토글. 반환값 = 토글 후 파일명
+/// 원격 파일명을 mods 폴더 안에 안전하게 join.
+/// 디렉터리 탈출(`..`, 절대경로, 구분자)을 제거하고 basename만 사용한다.
+pub fn safe_join(dir: &std::path::Path, remote_name: &str) -> Result<std::path::PathBuf> {
+    let normalized = remote_name.replace('\\', "/");
+    let base = std::path::Path::new(&normalized)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .filter(|n| !n.is_empty() && *n != "." && *n != "..")
+        .with_context(|| format!("유효하지 않은 파일명: {remote_name}"))?;
+    Ok(dir.join(base))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn safe_join_blocks_traversal() {
+        let dir = std::path::Path::new("/mods");
+        assert!(safe_join(dir, "../../evil.jar").is_ok()); // basename만 취함
+        assert_eq!(
+            safe_join(dir, "../../evil.jar").unwrap(),
+            dir.join("evil.jar")
+        );
+        assert!(safe_join(dir, "").is_err());
+        assert!(safe_join(dir, "..").is_err());
+        assert!(safe_join(dir, "/").is_err());
+        assert_eq!(
+            safe_join(dir, "sub\\name.jar").unwrap(),
+            dir.join("name.jar")
+        );
+        assert_eq!(
+            safe_join(dir, "sodium-fabric-1.2.3.jar").unwrap(),
+            dir.join("sodium-fabric-1.2.3.jar")
+        );
+    }
+}
 pub fn toggle_mod_file(mods_dir: &std::path::Path, file_name: &str) -> Result<String> {
     let src = mods_dir.join(file_name);
     if file_name.ends_with(".jar.disabled") {

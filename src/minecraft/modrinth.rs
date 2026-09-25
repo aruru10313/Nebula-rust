@@ -153,7 +153,7 @@ pub async fn install_latest(
         .context("해당 MC버전+Fabric 호환 버전이 없음")?;
     let file = pick_file(v).context("버전에 파일이 없음")?;
     std::fs::create_dir_all(mods_dir)?;
-    let dest = mods_dir.join(&file.filename);
+    let dest = super::mods::safe_join(mods_dir, &file.filename)?;
     super::mods::download_url_to(client, &file.url, &dest).await?;
     Ok((v.clone(), dest))
 }

@@ -2021,7 +2021,7 @@ dependencies = [
 
 [[package]]
 name = "nebulya-launcher"
-version = "7.5.0"
+version = "7.5.1"
 dependencies = [
  "ab_glyph",
  "anyhow",

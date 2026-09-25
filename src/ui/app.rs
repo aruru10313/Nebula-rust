@@ -62,6 +62,7 @@ pub struct NebulyaApp {
     maximized: bool,
     pub show_update_dialog: bool,
     update_dl: Arc<Mutex<Option<(u64, Option<u64>)>>>,
+    launch_rx: Option<std::sync::mpsc::Receiver<LaunchOutcome>>,
     pub runtime: tokio::runtime::Runtime,
     pub http: reqwest::Client,
     progress_state: Arc<Mutex<Option<LaunchProgress>>>,
@@ -115,6 +116,7 @@ impl NebulyaApp {
             maximized: false,
             show_update_dialog: false,
             update_dl: Arc::new(Mutex::new(None)),
+            launch_rx: None,
             runtime,
             http,
             progress_state: Arc::new(Mutex::new(None)),
@@ -534,6 +536,7 @@ impl NebulyaApp {
     }
 
     /// 플레이 버튼 (정품 전용: 계정 없으면 실행 불가)
+    /// 준비·다운로드·실행 전체를 백그라운드 스레드로 돌려 UI가 얼지 않는다.
     pub fn launch(&mut self) {
         if self.launching {
             return;
@@ -543,31 +546,15 @@ impl NebulyaApp {
             self.log("실행 거부: 정품 계정 없음");
             return;
         }
-        let Some(mut inst) = self.selected_instance().cloned() else {
+        let Some(inst) = self.selected_instance().cloned() else {
             self.status = "인스턴스가 없습니다".into();
             return;
         };
         let config = self.config.clone();
-        // 정품 세션 확보 (갱신 실패 시 실행하지 않음 — 오프라인 폴백 없음)
-        let (session, refreshed) = self
-            .runtime
-            .block_on(crate::minecraft::auth::ensure_session(
-                &self.http,
-                &config.ms_client_id_resolved(),
-                &config.username,
-                config.account.as_ref(),
-            ));
-        if let Some(acc) = refreshed {
-            self.config.account = Some(acc);
-            self.config.username = self.config.account.as_ref().unwrap().username.clone();
-            self.persist();
-            self.log("정품 토큰 자동 갱신됨");
-        }
-        if session.offline {
-            self.status = "정품 세션 갱신 실패 — 설정에서 다시 로그인하세요".into();
-            self.log("실행 거부: 정품 세션 없음");
-            return;
-        }
+        let http = self.http.clone();
+        let progress_state = self.progress_state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.launch_rx = Some(rx);
         self.launching = true;
         self.status = format!("실행 준비 중... ({})", inst.display_version());
         self.log(format!(
@@ -575,60 +562,104 @@ impl NebulyaApp {
             inst.name,
             inst.display_version()
         ));
-        self.discord
-            .show_playing(&inst.name, &inst.display_version());
 
-        let progress_state = self.progress_state.clone();
-        let cb = move |p: LaunchProgress| {
-            if let Ok(mut guard) = progress_state.lock() {
-                *guard = Some(p);
-            }
-        };
-
-        // 준비+실행은 별도 스레드 (UI 블로킹 방지). tokio runtime는 block_on 사용.
-        // child stdout은 이후 로그 탭에서 스트리밍 (phase 2에서 실시간 파이프 예정).
-        let handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build();
-            let rt = match rt {
-                Ok(rt) => rt,
-                Err(e) => return Err(anyhow::anyhow!("runtime: {e}")),
+        std::thread::spawn(move || {
+            let send = |o: LaunchOutcome| {
+                let _ = tx.send(o);
             };
-            rt.block_on(crate::minecraft::launcher::prepare_and_launch(
+            let rt = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    send(LaunchOutcome::Failed(format!("런타임 오류: {e}")));
+                    return;
+                }
+            };
+            // 정품 세션 확보 (갱신 실패 시 실행하지 않음 — 오프라인 폴백 없음)
+            let (session, refreshed) = rt.block_on(crate::minecraft::auth::ensure_session(
+                &http,
+                &config.ms_client_id_resolved(),
+                &config.username,
+                config.account.as_ref(),
+            ));
+            if session.offline {
+                send(LaunchOutcome::Failed(
+                    "정품 세션 갱신 실패 — 계정 탭에서 다시 로그인하세요".into(),
+                ));
+                return;
+            }
+            let cb = move |p: LaunchProgress| {
+                if let Ok(mut guard) = progress_state.lock() {
+                    *guard = Some(p);
+                }
+            };
+            let mut inst = inst;
+            match rt.block_on(crate::minecraft::launcher::prepare_and_launch(
                 &config, &mut inst, &session, cb,
-            ))
-            .map(|_| inst)
+            )) {
+                Ok(_) => send(LaunchOutcome::Done { inst, refreshed }),
+                Err(e) => send(LaunchOutcome::Failed(format!("{e:#}"))),
+            }
         });
+    }
 
-        // 결과 폴링은 다음 프레임들에서 progress와 함께 처리하기 위해
-        // 여기서는 즉시 join하지 않고, launching 상태만 유지.
-        // 단순화를 위해 phase 1에서는 짧은 블로킹 join + 상태 업데이트:
-        match handle.join() {
-            Ok(Ok(mut inst)) => {
+    /// 백그라운드 실행 결과 반영 (매 프레임)
+    fn poll_launch(&mut self) {
+        let outcome = match &self.launch_rx {
+            Some(rx) => match rx.try_recv() {
+                Ok(o) => Some(o),
+                Err(std::sync::mpsc::TryRecvError::Empty) => None,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    Some(LaunchOutcome::Failed("실행 스레드 종료".into()))
+                }
+            },
+            None => None,
+        };
+        let Some(outcome) = outcome else {
+            return;
+        };
+        self.launch_rx = None;
+        self.launching = false;
+        match outcome {
+            LaunchOutcome::Done {
+                mut inst,
+                refreshed,
+            } => {
+                if let Some(acc) = refreshed {
+                    self.config.account = Some(acc);
+                    self.config.username = self.config.account.as_ref().unwrap().username.clone();
+                    self.log("정품 토큰 자동 갱신됨");
+                }
                 inst.total_plays += 1;
                 inst.last_played = Some(chrono::Utc::now());
                 if let Some(existing) = self.instances.iter_mut().find(|i| i.id == inst.id) {
                     *existing = inst.clone();
                 }
                 self.status = format!("{} 실행 중", inst.name);
-                self.log("게임 프로세스 시작됨 (콘솔 로그는 phase 2에서 스트리밍)");
+                self.log("게임 프로세스 시작됨 (게임 로그 버튼으로 확인)");
+                self.discord
+                    .show_playing(&inst.name, &inst.display_version());
                 self.persist();
             }
-            Ok(Err(e)) => {
-                self.status = format!("실행 실패: {e:#}");
-                self.log(format!("실행 실패: {e:#}"));
-                let user = self.config.username.clone();
-                self.discord.show_home(&user);
-            }
-            Err(_) => {
-                self.status = "스레드 오류".into();
+            LaunchOutcome::Failed(e) => {
+                self.status = format!("실행 실패: {e}");
+                self.log(format!("실행 실패: {e}"));
                 let user = self.config.username.clone();
                 self.discord.show_home(&user);
             }
         }
-        self.launching = false;
     }
+}
+
+/// 백그라운드 실행 스레드 → UI 전달용 결과
+enum LaunchOutcome {
+    Done {
+        inst: Instance,
+        refreshed: Option<crate::minecraft::auth::StoredAccount>,
+    },
+    Failed(String),
 }
 
 // ---------------- egui ----------------
@@ -643,6 +674,8 @@ impl eframe::App for NebulyaApp {
         self.poll_update_result();
         // Java 설치 결과 반영
         self.poll_java_install();
+        // 백그라운드 실행 결과 반영
+        self.poll_launch();
 
         // 커스텀 타이틀바 (온보딩 게이트보다 먼저 렌더링)
         self.render_titlebar(ctx);

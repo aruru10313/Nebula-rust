@@ -82,7 +82,10 @@ impl NebulyaApp {
             status: "준비됨".to_string(),
             progress: None,
             launching: false,
-            logs: vec!["★ Nebulya Launcher v0.3 stellar 초기화".to_string()],
+            logs: vec![format!(
+                "★ Nebulya Launcher v{} stellar 초기화",
+                env!("CARGO_PKG_VERSION")
+            )],
             new_instance_name: "새 인스턴스".to_string(),
             new_mc_version: "1.20.1".to_string(),
             new_loader_version: "0.16.9".to_string(),

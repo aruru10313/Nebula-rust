@@ -24,6 +24,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             match save_result {
                 Ok(()) => {
                     app.sync_discord();
+                    app.refresh_java_version();
                     app.status = "설정 저장됨".to_string();
                 }
                 Err(e) => app.status = format!("저장 실패: {e:#}"),

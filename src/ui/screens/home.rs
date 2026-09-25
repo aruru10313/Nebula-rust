@@ -194,9 +194,12 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             .selected_instance()
             .map(|i| i.scan_mod_files(&app.config.game_root).len().to_string())
             .unwrap_or_else(|| "-".into());
-        let java = app.config.effective_java();
-        let ver = crate::minecraft::java::java_version(&java).unwrap_or_default();
-        let short = ver.split('.').take(2).collect::<Vec<_>>().join(".");
+        let short = app
+            .java_version_cache
+            .split('.')
+            .take(2)
+            .collect::<Vec<_>>()
+            .join(".");
         (plays, mods_count, short)
     };
     ui.horizontal(|ui| {

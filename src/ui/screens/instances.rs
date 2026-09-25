@@ -56,20 +56,16 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     );
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.vertical(|ui| {
-                        if theme::accent_button(ui, "▶ 실행").clicked() {
-                            app.config.selected_instance = Some(inst.id.clone());
-                            app.launch();
-                        }
-                        ui.horizontal(|ui| {
-                            if !selected && theme::ghost_button(ui, "선택").clicked() {
-                                app.config.selected_instance = Some(inst.id.clone());
-                            }
-                            if theme::danger_button(ui, "삭제").clicked() {
-                                app.confirm_delete_instance = Some(inst.id.clone());
-                            }
-                        });
-                    });
+                    if theme::danger_button(ui, "삭제").clicked() {
+                        app.confirm_delete_instance = Some(inst.id.clone());
+                    }
+                    if ui.button("▶ 실행").clicked() {
+                        app.config.selected_instance = Some(inst.id.clone());
+                        app.launch();
+                    }
+                    if !selected && ui.button("선택").clicked() {
+                        app.config.selected_instance = Some(inst.id.clone());
+                    }
                 });
             });
         });

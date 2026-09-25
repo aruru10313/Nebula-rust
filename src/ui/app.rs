@@ -70,6 +70,8 @@ pub struct NebulyaApp {
     pub nebula_status: String,
     pub nebula_pending_verify: bool,
     pub nebula_mode_signup: bool,
+    /// Java 버전 캐시 (매 프레임 프로세스 실행 방지)
+    pub java_version_cache: String,
     minimize_after_launch: bool,
     pub confirm_delete_instance: Option<String>,
     pub runtime: tokio::runtime::Runtime,
@@ -133,6 +135,7 @@ impl NebulyaApp {
             nebula_status: String::new(),
             nebula_pending_verify: false,
             nebula_mode_signup: false,
+            java_version_cache: String::new(),
             minimize_after_launch: false,
             confirm_delete_instance: None,
             runtime,
@@ -140,6 +143,7 @@ impl NebulyaApp {
             progress_state: Arc::new(Mutex::new(None)),
         };
         app.refresh_remote_lists();
+        app.refresh_java_version();
         app.persist();
         let user = app.config.username.clone();
         app.discord.show_home(&user);
@@ -401,6 +405,7 @@ impl NebulyaApp {
             match res {
                 Ok(path) => {
                     self.config.java_path = path.clone();
+                    self.refresh_java_version();
                     self.persist();
                     self.java_install_status = "Java 설치 완료".to_string();
                     self.log(format!("관리 JRE 설치됨: {path}"));
@@ -587,6 +592,12 @@ impl NebulyaApp {
         }
     }
 
+    /// Java 버전 캐시 갱신 (프로세스 1회 실행)
+    pub fn refresh_java_version(&mut self) {
+        let java = self.config.effective_java();
+        self.java_version_cache = crate::minecraft::java::java_version(&java).unwrap_or_default();
+    }
+
     /// Mojang/Fabric에서 버전 목록 비동기 갱신 (실패해도 기본값 유지)
     fn refresh_remote_lists(&mut self) {
         let http = self.http.clone();
@@ -745,6 +756,11 @@ impl NebulyaApp {
         };
         self.launch_rx = None;
         self.launching = false;
+        self.progress = None;
+        *self
+            .progress_state
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = None;
         match outcome {
             LaunchOutcome::Done {
                 mut inst,

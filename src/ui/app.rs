@@ -11,6 +11,7 @@ pub enum Tab {
     Home,
     Instances,
     Mods,
+    Account,
     Settings,
 }
 
@@ -20,6 +21,7 @@ impl Tab {
             Tab::Home => "홈",
             Tab::Instances => "인스턴스",
             Tab::Mods => "모드",
+            Tab::Account => "계정",
             Tab::Settings => "설정",
         }
     }
@@ -28,6 +30,7 @@ impl Tab {
             Tab::Home => "▶",
             Tab::Instances => "▦",
             Tab::Mods => "◆",
+            Tab::Account => "👤",
             Tab::Settings => "⚙",
         }
     }
@@ -675,7 +678,13 @@ impl eframe::App for NebulyaApp {
                 crate::ui::theme::star_divider(ui);
                 ui.add_space(6.0);
 
-                for tab in [Tab::Home, Tab::Instances, Tab::Mods, Tab::Settings] {
+                for tab in [
+                    Tab::Home,
+                    Tab::Instances,
+                    Tab::Mods,
+                    Tab::Account,
+                    Tab::Settings,
+                ] {
                     let selected = self.tab == tab;
                     let label = format!("{}  {}", tab.icon(), tab.label());
                     let rich = if selected {
@@ -815,6 +824,7 @@ impl eframe::App for NebulyaApp {
             Tab::Home => crate::ui::screens::home::show(self, ui),
             Tab::Instances => crate::ui::screens::instances::show(self, ui),
             Tab::Mods => crate::ui::screens::mods::show(self, ui),
+            Tab::Account => crate::ui::screens::account::show(self, ui),
             Tab::Settings => crate::ui::screens::settings::show(self, ui),
         });
 

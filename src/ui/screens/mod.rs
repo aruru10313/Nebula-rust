@@ -1,3 +1,4 @@
+pub mod account;
 pub mod home;
 pub mod instances;
 pub mod mods;

@@ -1,4 +1,3 @@
-use crate::minecraft::auth::LoginState;
 use crate::ui::theme;
 use crate::ui::NebulyaApp;
 
@@ -7,8 +6,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::section_header(ui, "⚙", "설정", "런처를 내 별자리처럼");
     ui.add_space(8.0);
 
-    account_card(app, ui);
-    ui.add_space(8.0);
+    // 계정 관리는 계정 탭에서 (인스턴스별 버전·로더 설정과 분리)
     game_card(app, ui);
     ui.add_space(8.0);
     link_card(app, ui);
@@ -32,118 +30,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     }
 }
 
-// ---- 1. 계정 ----
-fn account_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
-    theme::card_frame().show(ui, |ui| {
-        theme::section_header(ui, "★", "계정", "Microsoft 정품 로그인");
-        if let Some(acc) = app.config.account.clone() {
-            ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new(format!("★ {}", acc.username))
-                        .size(16.0)
-                        .strong(),
-                );
-                theme::badge(ui, "정품", theme::SUCCESS);
-            });
-            ui.monospace(format!("UUID {}", acc.uuid));
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                if theme::ghost_button(ui, "토큰 갱신").clicked() {
-                    let http = app.http.clone();
-                    let cid = app.config.ms_client_id_resolved();
-                    let acc2 = acc.clone();
-                    let rt_handle = std::thread::spawn(move || {
-                        let rt = tokio::runtime::Builder::new_multi_thread()
-                            .enable_all()
-                            .build();
-                        match rt {
-                            Ok(rt) => rt.block_on(crate::minecraft::auth::refresh_account(
-                                &http, &cid, &acc2,
-                            )),
-                            Err(e) => Err(anyhow::anyhow!("{e}")),
-                        }
-                    });
-                    match rt_handle.join() {
-                        Ok(Ok(new_acc)) => {
-                            app.config.username = new_acc.username.clone();
-                            app.config.account = Some(new_acc);
-                            app.persist();
-                            app.status = "정품 토큰 갱신됨".to_string();
-                        }
-                        Ok(Err(e)) => app.status = format!("갱신 실패: {e:#}"),
-                        Err(_) => app.status = "스레드 오류".to_string(),
-                    }
-                }
-                if theme::danger_button(ui, "로그아웃").clicked() {
-                    app.config.account = None;
-                    app.config.onboarding_done = false;
-                    app.persist();
-                    app.status = "로그아웃됨".to_string();
-                }
-            });
-        } else {
-            ui.label(
-                egui::RichText::new("정품 로그인하면 모든 정품 서버에 접속할 수 있습니다.")
-                    .color(theme::TEXT_DIM)
-                    .size(12.0),
-            );
-            ui.add_space(2.0);
-            let snapshot = app.login_state.lock().unwrap().clone();
-            match snapshot {
-                LoginState::Idle => {
-                    if theme::accent_button(ui, "★ Microsoft 로그인").clicked() {
-                        app.start_ms_login();
-                    }
-                }
-                LoginState::Code { user_code, uri } => {
-                    theme::tile_frame().show(ui, |ui| {
-                        ui.label(
-                            egui::RichText::new("브라우저에서 아래 코드를 입력하세요").strong(),
-                        );
-                        let mut code = user_code.clone();
-                        ui.add(
-                            egui::TextEdit::singleline(&mut code)
-                                .desired_width(220.0)
-                                .font(egui::TextStyle::Heading)
-                                .horizontal_align(egui::Align::Center),
-                        );
-                        let left = *app.login_wait_secs.lock().unwrap();
-                        if left > 0 {
-                            ui.label(
-                                egui::RichText::new(format!("남은 시간: {left}초"))
-                                    .color(theme::TEXT_DIM)
-                                    .size(12.0),
-                            );
-                        }
-                        ui.monospace(&uri);
-                        ui.horizontal(|ui| {
-                            if theme::accent_button(ui, "브라우저 열기").clicked() {
-                                let _ = open::that(&uri);
-                            }
-                            if theme::ghost_button(ui, "취소").clicked() {
-                                app.cancel_ms_login();
-                            }
-                        });
-                    });
-                }
-                LoginState::Working(msg) => {
-                    ui.horizontal(|ui| {
-                        ui.spinner();
-                        ui.label(msg);
-                    });
-                    if theme::ghost_button(ui, "취소").clicked() {
-                        app.cancel_ms_login();
-                    }
-                }
-                LoginState::Done(_) | LoginState::Failed(_) => {
-                    ui.spinner();
-                }
-            }
-        }
-    });
-}
-
-// ---- 2. 게임 ----
+// ---- 1. 게임 ----
 fn game_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
         theme::section_header(ui, "☕", "게임", "Java · 메모리 · 화면");
@@ -194,7 +81,7 @@ fn game_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     });
 }
 
-// ---- 3. 연동 (모드 제공자 + Discord) ----
+// ---- 2. 연동 (모드 제공자 + Discord) ----
 fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
         theme::section_header(ui, "◆", "연동", "모드 · Discord");
@@ -239,7 +126,7 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     });
 }
 
-// ---- 4. 고급 ----
+// ---- 3. 고급 ----
 fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
         theme::section_header(ui, "≡", "고급", "버전 · 저장 위치");

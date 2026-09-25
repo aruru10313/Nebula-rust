@@ -54,7 +54,7 @@ pub async fn fetch_manifest(client: &reqwest::Client) -> Result<VersionManifest>
 
 // ---- version 상세 json (assets, libraries, mainClass 등) ----
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VersionJson {
     pub id: String,
     #[serde(rename = "mainClass")]
@@ -71,13 +71,13 @@ pub struct VersionJson {
     pub java_version: Option<JavaVersion>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VersionArguments {
     pub game: Vec<serde_json::Value>,
     pub jvm: Vec<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AssetIndex {
     pub id: String,
     pub url: String,
@@ -87,24 +87,24 @@ pub struct AssetIndex {
     pub total_size: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Downloads {
     pub client: DownloadArtifact,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DownloadArtifact {
     pub url: String,
     pub sha1: String,
     pub size: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct JavaVersion {
     pub major: u32,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Library {
     pub name: String,
     pub downloads: Option<LibraryDownloads>,
@@ -113,13 +113,13 @@ pub struct Library {
     pub extract: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LibraryDownloads {
     pub artifact: Option<LibraryArtifact>,
     pub classifiers: Option<std::collections::HashMap<String, LibraryArtifact>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LibraryArtifact {
     pub path: String,
     pub url: String,
@@ -127,13 +127,13 @@ pub struct LibraryArtifact {
     pub size: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Rule {
     pub action: String,
     pub os: Option<OsRule>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OsRule {
     pub name: Option<String>,
 }

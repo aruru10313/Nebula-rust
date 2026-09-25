@@ -34,17 +34,40 @@ pub async fn prepare_and_launch(
         total: 1,
     });
 
-    // 1. Mojang manifest → 해당 버전 url 찾기
-    let manifest = crate::minecraft::version::fetch_manifest(&client).await?;
+    // 1. Mojang manifest → 해당 버전 url 찾기 (오프라인이면 캐시 사용)
+    let root = &config.game_root;
+    let manifest_path = root.join("manifest_cache.json");
+    let manifest = match crate::minecraft::version::fetch_manifest(&client).await {
+        Ok(m) => {
+            let _ = save_cache(&manifest_path, &m);
+            m
+        }
+        Err(e) => {
+            tracing::warn!("매니페스트 조회 실패, 캐시 사용: {e:#}");
+            load_cache(&manifest_path).context("오프라인 상태이며 버전 캐시가 없습니다")?
+        }
+    };
     let entry = manifest
         .versions
         .iter()
         .find(|v| v.id == instance.minecraft_version)
         .with_context(|| format!("지원하지 않는 버전: {}", instance.minecraft_version))?;
+    let version_path = root
+        .join("versions")
+        .join(&instance.minecraft_version)
+        .join(format!("{}.json", instance.minecraft_version));
     let mut version_json =
-        crate::minecraft::version::fetch_version_json(&client, &entry.url).await?;
+        match crate::minecraft::version::fetch_version_json(&client, &entry.url).await {
+            Ok(v) => {
+                let _ = save_cache(&version_path, &v);
+                v
+            }
+            Err(e) => {
+                tracing::warn!("버전 JSON 조회 실패, 캐시 사용: {e:#}");
+                load_cache(&version_path).context("오프라인 상태이며 버전 캐시가 없습니다")?
+            }
+        };
 
-    let root = &config.game_root;
     let game_dir = instance.game_dir(root);
     std::fs::create_dir_all(&game_dir)?;
     std::fs::create_dir_all(root.join("libraries"))?;
@@ -60,14 +83,32 @@ pub async fn prepare_and_launch(
             done: 0,
             total: 1,
         });
-        let loaders =
-            crate::minecraft::fabric::fetch_loaders_for_game(&client, &instance.minecraft_version)
-                .await?;
-        let found = loaders
-            .iter()
-            .find(|l| l.loader.version == instance.loader_version)
-            .or_else(|| loaders.iter().find(|l| l.loader.stable))
-            .context("Fabric loader 정보를 못 찾음")?;
+        // 로더 메타도 캐시 (오프라인 실행용)
+        let meta_path = root.join("fabric-meta").join(format!(
+            "{}-{}.json",
+            instance.minecraft_version, instance.loader_version
+        ));
+        let found = match crate::minecraft::fabric::fetch_loaders_for_game(
+            &client,
+            &instance.minecraft_version,
+        )
+        .await
+        {
+            Ok(loaders) => {
+                let found = loaders
+                    .iter()
+                    .find(|l| l.loader.version == instance.loader_version)
+                    .or_else(|| loaders.iter().find(|l| l.loader.stable))
+                    .context("Fabric loader 정보를 못 찾음")?
+                    .clone();
+                let _ = save_cache(&meta_path, &found);
+                found
+            }
+            Err(e) => {
+                tracing::warn!("Fabric 메타 조회 실패, 캐시 사용: {e:#}");
+                load_cache(&meta_path).context("오프라인 상태이며 Fabric 캐시가 없습니다")?
+            }
+        };
 
         // launcherMeta.libraries.{common,client} → Library로 변환은 복잡하므로
         // phase 1에서는 maven 좌표 → URL로 직접 다운로드하는 단순 방식 사용
@@ -342,6 +383,22 @@ fn append_lines(pipe: impl std::io::Read + Send + 'static, path: &std::path::Pat
 }
 
 // ---------- helpers ----------
+
+/// JSON 캐시 저장 (오프라인 실행용)
+fn save_cache(path: &Path, value: &impl serde::Serialize) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let json = serde_json::to_string_pretty(value)?;
+    std::fs::write(path, json)?;
+    Ok(())
+}
+
+/// JSON 캐시 로드
+fn load_cache<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
+    let bytes = std::fs::read(path).with_context(|| format!("캐시 없음: {}", path.display()))?;
+    Ok(serde_json::from_slice(&bytes)?)
+}
 
 fn natives_dir(root: &Path, version_id: &str) -> PathBuf {
     root.join("versions").join(version_id).join("natives")

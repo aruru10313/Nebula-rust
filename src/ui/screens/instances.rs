@@ -13,7 +13,6 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     });
     ui.add_space(8.0);
 
-    let mut to_delete: Option<String> = None;
     for inst in app.instances.clone() {
         let selected = app.config.selected_instance.as_deref() == Some(&inst.id);
         let frame = if selected {
@@ -67,7 +66,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                                 app.config.selected_instance = Some(inst.id.clone());
                             }
                             if theme::danger_button(ui, "삭제").clicked() {
-                                to_delete = Some(inst.id.clone());
+                                app.confirm_delete_instance = Some(inst.id.clone());
                             }
                         });
                     });
@@ -77,10 +76,40 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         ui.add_space(6.0);
     }
 
-    if let Some(id) = to_delete {
-        app.instances.retain(|i| i.id != id);
-        if app.config.selected_instance.as_deref() == Some(&id) {
-            app.config.selected_instance = app.instances.first().map(|i| i.id.clone());
-        }
+    if let Some(id) = app.confirm_delete_instance.clone() {
+        let name = app
+            .instances
+            .iter()
+            .find(|i| i.id == id)
+            .map(|i| i.name.clone())
+            .unwrap_or_default();
+        egui::Window::new("인스턴스 삭제")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ui.ctx(), |ui| {
+                ui.set_min_width(320.0);
+                ui.label(format!("'{name}' 인스턴스를 삭제할까요?"));
+                ui.label(
+                    egui::RichText::new("목록에서만 제거되며 게임 파일은 남습니다.")
+                        .color(theme::TEXT_DIM)
+                        .size(12.0),
+                );
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if theme::danger_button(ui, "삭제").clicked() {
+                        app.instances.retain(|i| i.id != id);
+                        if app.config.selected_instance.as_deref() == Some(&id) {
+                            app.config.selected_instance =
+                                app.instances.first().map(|i| i.id.clone());
+                        }
+                        app.persist();
+                        app.confirm_delete_instance = None;
+                    }
+                    if theme::ghost_button(ui, "취소").clicked() {
+                        app.confirm_delete_instance = None;
+                    }
+                });
+            });
     }
 }

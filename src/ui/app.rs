@@ -69,6 +69,8 @@ pub struct NebulyaApp {
     pub nebula_code: String,
     pub nebula_status: String,
     pub nebula_pending_verify: bool,
+    minimize_after_launch: bool,
+    pub confirm_delete_instance: Option<String>,
     pub runtime: tokio::runtime::Runtime,
     pub http: reqwest::Client,
     progress_state: Arc<Mutex<Option<LaunchProgress>>>,
@@ -129,6 +131,8 @@ impl NebulyaApp {
             nebula_code: String::new(),
             nebula_status: String::new(),
             nebula_pending_verify: false,
+            minimize_after_launch: false,
+            confirm_delete_instance: None,
             runtime,
             http,
             progress_state: Arc::new(Mutex::new(None)),
@@ -753,6 +757,7 @@ impl NebulyaApp {
                 self.log("게임 프로세스 시작됨 (게임 로그 버튼으로 확인)");
                 self.discord
                     .show_playing(&inst.name, &inst.display_version());
+                self.minimize_after_launch = self.config.hide_on_launch;
                 self.persist();
             }
             LaunchOutcome::Failed(e) => {
@@ -791,6 +796,12 @@ impl eframe::App for NebulyaApp {
 
         // 커스텀 타이틀바 (온보딩 게이트보다 먼저 렌더링)
         self.render_titlebar(ctx);
+
+        // 실행 직후 숨기기 옵션
+        if self.minimize_after_launch {
+            self.minimize_after_launch = false;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+        }
 
         // progress 상태 동기화
         if let Ok(guard) = self.progress_state.lock() {

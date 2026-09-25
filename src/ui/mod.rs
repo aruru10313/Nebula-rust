@@ -5,4 +5,3 @@ pub mod theme;
 pub mod widgets;
 
 pub use app::NebulyaApp;
-pub use app::Tab;

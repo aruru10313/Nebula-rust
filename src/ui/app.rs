@@ -64,7 +64,8 @@ pub struct NebulyaApp {
     update_dl: Arc<Mutex<Option<(u64, Option<u64>)>>>,
     launch_rx: Option<std::sync::mpsc::Receiver<LaunchOutcome>>,
     remote_lists_rx: Option<std::sync::mpsc::Receiver<RemoteListsOutcome>>,
-    mod_task_rx: Option<std::sync::mpsc::Receiver<crate::ui::screens::mods::ModTaskOutcome>>,
+    pub(crate) mod_task_rx:
+        Option<std::sync::mpsc::Receiver<crate::ui::screens::mods::ModTaskOutcome>>,
     pub nebula_email: String,
     pub nebula_username: String,
     pub nebula_password: String,

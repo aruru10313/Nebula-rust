@@ -259,8 +259,10 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           rm -rf release-assets && mkdir -p release-assets
-          gh release download "$TAG" -D release-assets
-          find release-assets -maxdepth 1 -type f -printf '%f\n' | sort | tee release-assets/asset-list.txt
+          gh release download "$TAG" -D release-assets \
+            --pattern 'nebulya-*' --pattern 'Nebulya-*'
+          find release-assets -maxdepth 1 -type f ! -name 'asset-list.txt' -printf '%f\n' \
+            | sort | tee release-assets/asset-list.txt
           test "$(wc -l < release-assets/asset-list.txt | tr -d ' ')" -eq 6
           grep -Eq '^nebulya-launcher-[0-9]+\.[0-9]+\.[0-9]+-windows-x86_64\.exe$' release-assets/asset-list.txt
           grep -Eq '^Nebulya-Launcher-Setup-[0-9]+\.[0-9]+\.[0-9]+-windows-x86_64\.exe$' release-assets/asset-list.txt

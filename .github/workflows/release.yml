@@ -1,0 +1,244 @@
+name: Release Nebulya Launcher
+
+# 태그 푸시에서만 실행된다. Actions 아티팩트를 사용하지 않으므로
+# 아티팩트 할당량과 무관하게 릴리스할 수 있다.
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    name: Create draft release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out tagged commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Validate release tag against Cargo.toml
+        id: release-tag
+        shell: bash
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "허용되지 않은 태그 형식입니다: $tag" >&2
+            exit 1
+          fi
+          version="$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)"
+          if [[ "$tag" != "v$version" ]]; then
+            echo "태그와 Cargo.toml 버전이 다릅니다: tag=$tag cargo=$version" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release-tag.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "이미 존재하는 릴리스입니다. 새로 만들지 않습니다: $TAG" >&2
+            exit 1
+          fi
+          gh release create "$TAG" --draft --generate-notes --title "$TAG"
+
+  build:
+    name: Build + Upload (${{ matrix.os }}/${{ matrix.target }})
+    needs: draft
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            ext: .exe
+            kind: windows
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            ext: ""
+            kind: linux
+          - os: macos-14
+            target: aarch64-apple-darwin
+            ext: ""
+            kind: macos
+
+    steps:
+      - name: Check out tagged commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Read package version
+        id: package-version
+        shell: bash
+        run: |
+          version="$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Cargo.toml 버전 형식이 올바르지 않습니다: $version" >&2
+            exit 1
+          fi
+          if [[ "v$version" != "${GITHUB_REF#refs/tags/}" ]]; then
+            echo "태그와 Cargo.toml 버전이 다릅니다." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxcb1-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev \
+            libwayland-dev libxkbcommon-dev libasound2-dev libssl-dev pkg-config
+
+      - name: Install Rust 1.98.1
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: 1.98.1
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684 # v2.8.0
+
+      - name: Build release binary
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Install pinned cargo-deb
+        if: runner.os == 'Linux'
+        run: cargo install cargo-deb --version 3.8.0 --locked
+
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/package-linux.sh ${{ matrix.target }} ${{ steps.package-version.outputs.version }}
+
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/package-macos.sh ${{ matrix.target }} ${{ steps.package-version.outputs.version }}
+
+      - name: Install pinned Inno Setup compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          INNO_URL: https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe
+          INNO_SHA256: 9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          Invoke-WebRequest -Uri $env:INNO_URL -OutFile $installer
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInvariant()
+          if ($actual -ne $env:INNO_SHA256.ToLowerInvariant()) {
+            throw "Inno Setup 체크섬 불일치: $actual"
+          }
+          gh release verify-asset is-6_7_3 "$installer" --repo jrsoftware/issrc
+          & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            throw "ISCC를 찾을 수 없습니다: $iscc"
+          }
+
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ steps.package-version.outputs.version }}'
+          $binary = "target\${{ matrix.target }}\release\nebulya-launcher${{ matrix.ext }}"
+          if (-not (Test-Path -LiteralPath $binary)) {
+            throw "릴리즈 바이너리를 찾을 수 없습니다: $binary"
+          }
+          New-Item -ItemType Directory -Force -Path dist\windows | Out-Null
+          Copy-Item -LiteralPath $binary -Destination "dist\windows\nebulya-launcher-$version-windows-x86_64${{ matrix.ext }}"
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          & $iscc installer\windows\nebulya-setup.iss "/DMyAppVersion=$version" "/DBinaryDir=${{ github.workspace }}\target\${{ matrix.target }}\release"
+          $setup = "dist\Nebulya-Launcher-Setup-$version.exe"
+          if (-not (Test-Path -LiteralPath $setup)) {
+            throw "Windows 설치 파일을 찾을 수 없습니다: $setup"
+          }
+          Move-Item -LiteralPath $setup -Destination "dist\windows\Nebulya-Launcher-Setup-$version-windows-x86_64.exe"
+          Get-ChildItem -File dist\windows | Format-Table Name, Length
+
+      - name: Upload files to draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          files="$(find dist/${{ matrix.kind }} -maxdepth 1 -type f | sort)"
+          if [[ -z "$files" ]]; then
+            echo "업로드할 파일이 없습니다: dist/${{ matrix.kind }}" >&2
+            exit 1
+          fi
+          echo "$files"
+          # shellcheck disable=SC2086
+          gh release upload "$TAG" $files
+
+  finalize:
+    name: Verify checksums and publish
+    needs: [draft, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download draft release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          rm -rf release-assets && mkdir -p release-assets
+          gh release download "$TAG" -D release-assets
+          find release-assets -maxdepth 1 -type f -printf '%f\n' | sort | tee release-assets/asset-list.txt
+          test "$(wc -l < release-assets/asset-list.txt | tr -d ' ')" -eq 6
+          grep -Eq '^nebulya-launcher-[0-9]+\.[0-9]+\.[0-9]+-windows-x86_64\.exe$' release-assets/asset-list.txt
+          grep -Eq '^Nebulya-Launcher-Setup-[0-9]+\.[0-9]+\.[0-9]+-windows-x86_64\.exe$' release-assets/asset-list.txt
+          grep -Eq '^nebulya-launcher-[0-9]+\.[0-9]+\.[0-9]+-x86_64-unknown-linux-gnu\.tar\.gz$' release-assets/asset-list.txt
+          grep -Eq '^nebulya-launcher_[0-9]+\.[0-9]+\.[0-9]+_x86_64-unknown-linux-gnu\.deb$' release-assets/asset-list.txt
+          grep -Eq '^nebulya-launcher-[0-9]+\.[0-9]+\.[0-9]+-aarch64-apple-darwin\.tar\.gz$' release-assets/asset-list.txt
+          grep -Eq '^nebulya-launcher-[0-9]+\.[0-9]+\.[0-9]+-aarch64-apple-darwin\.dmg$' release-assets/asset-list.txt
+          rm release-assets/asset-list.txt
+
+      - name: Create and upload checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          (cd release-assets && sha256sum nebulya-launcher-* Nebulya-Launcher-Setup-* > SHA256SUMS)
+          (cd release-assets && sha256sum -c SHA256SUMS)
+          gh release upload "$TAG" release-assets/SHA256SUMS
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          count="$(gh release view "$TAG" --json assets --jq '.assets | length')"
+          if [[ "$count" != "7" ]]; then
+            echo "릴리스 자산 개수가 올바르지 않습니다: $count" >&2
+            exit 1
+          fi
+          gh release edit "$TAG" --draft=false

@@ -51,7 +51,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.release-tag.outputs.tag }}
         run: |
-          if gh release view "$TAG" --json isDraft --jq -e .isDraft >/dev/null 2>&1; then
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = "true" ]; then
             echo "기존 draft 릴리스를 재사용합니다: $TAG"
             exit 0
           fi
@@ -278,7 +278,7 @@ jobs:
         run: |
           (cd release-assets && sha256sum nebulya-launcher-* Nebulya-Launcher-Setup-* > SHA256SUMS)
           (cd release-assets && sha256sum -c SHA256SUMS)
-          if gh release view "$TAG" --json assets --jq -e '.assets[].name | select(. == "SHA256SUMS")' >/dev/null 2>&1; then
+          if [ -n "$(gh release view "$TAG" --json assets --jq '.assets[].name | select(. == "SHA256SUMS")')" ]; then
             echo "SHA256SUMS가 이미 업로드되어 있습니다. 건너뜁니다."
           else
             gh release upload "$TAG" release-assets/SHA256SUMS

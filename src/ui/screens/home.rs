@@ -235,6 +235,10 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 if theme::ghost_button(ui, "지우기").clicked() {
                     app.logs.clear();
                 }
+                let launcher_log = app.config.game_root.join("launcher.log");
+                if launcher_log.exists() && theme::ghost_button(ui, "런처 로그").clicked() {
+                    let _ = open::that(&launcher_log);
+                }
                 let game_log = app.selected_instance().map(|inst| {
                     inst.game_dir(&app.config.game_root)
                         .join("logs")

@@ -1187,6 +1187,12 @@ impl eframe::App for NebulyaApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        // 항해일지를 파일로 보관 (폴더에서 바로 확인 가능)
+        let log_path = self.config.game_root.join("launcher.log");
+        if let Some(parent) = log_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&log_path, self.logs.join("\n"));
         self.persist();
     }
 }

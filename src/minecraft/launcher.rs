@@ -280,6 +280,7 @@ fn drain_child_output(
     if let Some(parent) = log_path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
+    rotate_game_logs(&log_path);
     // 새 실행이므로 기존 로그를 비운다
     let _ = std::fs::write(&log_path, "");
     if let Some(out) = child.stdout.take() {
@@ -291,6 +292,38 @@ fn drain_child_output(
         std::thread::spawn(move || append_lines(err, &path));
     }
     child
+}
+
+/// 이전 latest.log를 타임스탬프 이름으로 보관 (최대 10개 유지)
+fn rotate_game_logs(latest: &std::path::Path) {
+    if !latest.exists() {
+        return;
+    }
+    let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+    if let Some(parent) = latest.parent() {
+        let archived = parent.join(format!("game-{stamp}.log"));
+        let _ = std::fs::rename(latest, &archived);
+        // 오래된 로그 정리 (latest + 최대 10개)
+        if let Ok(entries) = std::fs::read_dir(parent) {
+            let mut logs: Vec<_> = entries
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|n| n.starts_with("game-") && n.ends_with(".log"))
+                        .unwrap_or(false)
+                })
+                .collect();
+            logs.sort();
+            while logs.len() > 10 {
+                if let Some(old) = logs.first() {
+                    let _ = std::fs::remove_file(old);
+                }
+                logs.remove(0);
+            }
+        }
+    }
 }
 
 fn append_lines(pipe: impl std::io::Read + Send + 'static, path: &std::path::Path) {

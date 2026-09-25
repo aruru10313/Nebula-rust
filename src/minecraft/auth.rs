@@ -257,24 +257,29 @@ pub async fn xbox_live_auth(
 ) -> Result<(String, String)> {
     let body = serde_json::json!({
         "Properties": {
-            "AuthMethod": "RDP",
+            "AuthMethod": "RPS",
             "SiteName": "user.auth.xboxlive.com",
             "RpsTicket": format!("d={ms_access_token}"),
         },
         "RelyingParty": "http://auth.xboxlive.com",
         "TokenType": "JWT",
     });
-    let r: XboxResp = client
+    let res = client
         .post("https://user.auth.xboxlive.com/user/authenticate")
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
+        .header("x-xbl-contract-version", "1")
         .json(&body)
         .send()
         .await
-        .context("XboxLive 인증 실패")?
-        .error_for_status()?
-        .json()
-        .await?;
+        .context("XboxLive 인증 실패")?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let body = res.text().await.unwrap_or_default();
+        let snippet: String = body.chars().take(300).collect();
+        anyhow::bail!("XboxLive 거부 ({status}): {snippet}");
+    }
+    let r: XboxResp = res.json().await.context("Xbox 응답 파싱 실패")?;
     let uhs = r.claims.xui.first().context("Xbox uhs 없음")?.uhs.clone();
     Ok((r.token, uhs))
 }

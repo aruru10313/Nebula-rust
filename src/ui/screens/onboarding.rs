@@ -110,12 +110,6 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 .color(theme::TEXT_FAINT)
                 .size(11.0),
         );
-        ui.label(
-            egui::RichText::new("정품 Minecraft: Java Edition이 필요합니다")
-                .color(theme::TEXT_FAINT)
-                .size(11.0),
-        );
-        ui.add_space(20.0);
         ui.add_space(20.0);
     });
 }

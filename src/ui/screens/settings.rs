@@ -14,69 +14,83 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     advanced_card(app, ui);
 
     ui.add_space(12.0);
-    if crate::ui::theme::accent_button(ui, "설정 저장").clicked() {
-        let save_result: anyhow::Result<()> = (|| {
-            app.config.save()?;
-            crate::core::instance::save_instances(&app.config.game_root, &app.instances)?;
-            Ok(())
-        })();
-        match save_result {
-            Ok(()) => {
-                app.sync_discord();
-                app.status = "설정 저장됨".to_string();
+    ui.vertical_centered(|ui| {
+        if crate::ui::theme::accent_button(ui, "설정 저장").clicked() {
+            let save_result: anyhow::Result<()> = (|| {
+                app.config.save()?;
+                crate::core::instance::save_instances(&app.config.game_root, &app.instances)?;
+                Ok(())
+            })();
+            match save_result {
+                Ok(()) => {
+                    app.sync_discord();
+                    app.status = "설정 저장됨".to_string();
+                }
+                Err(e) => app.status = format!("저장 실패: {e:#}"),
             }
-            Err(e) => app.status = format!("저장 실패: {e:#}"),
         }
-    }
+    });
+}
+
+/// 두 칸 행: 왼쪽 고정 라벨 + 오른쪽 컨텐츠
+fn row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
+    ui.horizontal(|ui| {
+        ui.add_sized(
+            [150.0, 20.0],
+            egui::Label::new(egui::RichText::new(label).color(theme::TEXT_DIM)),
+        );
+        add(ui);
+    });
 }
 
 // ---- 1. 게임 ----
 fn game_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
         theme::section_header(ui, "☕", "게임", "Java · 메모리 · 화면");
-        ui.horizontal(|ui| {
-            ui.label("Java 경로 (비우면 자동탐지)");
+        row(ui, "Java 경로", |ui| {
             ui.text_edit_singleline(&mut app.config.java_path);
             if ui.small_button("찾기").clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_file() {
                     app.config.java_path = path.to_string_lossy().to_string();
                 }
             }
-        });
-        ui.label(
-            egui::RichText::new(format!("현재: {}", app.config.java_path))
-                .color(theme::TEXT_DIM)
-                .size(11.0),
-        );
-        ui.horizontal(|ui| {
-            if ui.small_button("Java 21 자동 설치").clicked() {
+            if ui.small_button("자동 설치").clicked() {
                 app.install_java_now();
             }
+        });
+        ui.horizontal(|ui| {
+            ui.add_space(150.0);
             ui.label(
                 egui::RichText::new(if app.java_install_status.is_empty() {
-                    "Adoptium JRE를 내려받아 런처 전용으로 설치합니다"
+                    "비우면 자동탐지 · 자동 설치는 Adoptium JRE 21"
                 } else {
                     &app.java_install_status
                 })
-                .color(theme::TEXT_DIM)
+                .color(theme::TEXT_FAINT)
                 .size(11.0),
             );
         });
-        ui.add_space(4.0);
-        ui.horizontal(|ui| {
-            ui.label("최대 RAM (MB)");
-            ui.add(egui::Slider::new(&mut app.config.ram_mb, 1024..=16384).step_by(256.0));
+        ui.add_space(6.0);
+        row(ui, "최대 RAM", |ui| {
+            ui.add(
+                egui::Slider::new(&mut app.config.ram_mb, 1024..=16384)
+                    .step_by(256.0)
+                    .suffix(" MB"),
+            );
         });
-        ui.horizontal(|ui| {
-            ui.label("최소 RAM (MB)");
-            ui.add(egui::Slider::new(&mut app.config.min_ram_mb, 512..=4096).step_by(256.0));
+        row(ui, "최소 RAM", |ui| {
+            ui.add(
+                egui::Slider::new(&mut app.config.min_ram_mb, 512..=4096)
+                    .step_by(256.0)
+                    .suffix(" MB"),
+            );
         });
-        ui.horizontal(|ui| {
-            ui.label("해상도");
+        row(ui, "해상도", |ui| {
             ui.add(egui::DragValue::new(&mut app.config.width).range(640..=3840));
             ui.label("x");
             ui.add(egui::DragValue::new(&mut app.config.height).range(480..=2160));
         });
+        ui.add_space(4.0);
         ui.checkbox(&mut app.config.hide_on_launch, "실행 시 런처 숨기기");
     });
 }
@@ -90,13 +104,13 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 .color(theme::TEXT_DIM)
                 .size(12.0),
         );
-        ui.horizontal(|ui| {
-            ui.label("CurseForge API 키");
+        ui.add_space(2.0);
+        row(ui, "CurseForge API 키", |ui| {
             ui.text_edit_singleline(&mut app.config.curseforge_api_key);
         });
         ui.add_space(4.0);
-        ui.horizontal(|ui| {
-            ui.checkbox(&mut app.config.discord_enabled, "디스코드에 상태 표시");
+        row(ui, "Discord 상태", |ui| {
+            ui.checkbox(&mut app.config.discord_enabled, "표시");
             let (dot, txt) =
                 if !app.config.discord_enabled || app.config.discord_client_id.trim().is_empty() {
                     ("○", "꺼짐")
@@ -119,8 +133,7 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 app.status = "Discord 재연결 시도".to_string();
             }
         });
-        ui.horizontal(|ui| {
-            ui.label("Discord Application ID");
+        row(ui, "Discord App ID", |ui| {
             ui.text_edit_singleline(&mut app.config.discord_client_id);
         });
     });
@@ -130,8 +143,8 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
 fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
         theme::section_header(ui, "≡", "고급", "버전 · 저장 위치");
-        ui.horizontal(|ui| {
-            ui.label(format!("현재 버전: v{}", env!("CARGO_PKG_VERSION")));
+        row(ui, "현재 버전", |ui| {
+            ui.label(format!("v{}", env!("CARGO_PKG_VERSION")));
             if ui.small_button("업데이트 확인").clicked() {
                 app.check_update_now();
             }
@@ -143,14 +156,17 @@ fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             }
         });
         if !app.update_status.is_empty() {
-            ui.label(
-                egui::RichText::new(&app.update_status)
-                    .color(theme::TEXT_DIM)
-                    .size(11.0),
-            );
+            ui.horizontal(|ui| {
+                ui.add_space(150.0);
+                ui.label(
+                    egui::RichText::new(&app.update_status)
+                        .color(theme::TEXT_DIM)
+                        .size(11.0),
+                );
+            });
         }
         ui.add_space(2.0);
-        ui.horizontal(|ui| {
+        row(ui, "저장 위치", |ui| {
             ui.monospace(format!("{}", app.config.game_root.display()));
             if ui.small_button("폴더 열기").clicked() {
                 let _ = open::that(&app.config.game_root);

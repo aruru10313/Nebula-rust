@@ -485,13 +485,6 @@ impl NebulyaApp {
         }
     }
 
-    /// 첫 실행 온보딩이 필요한지 (MS·Nebulya 계정 모두 없고 온보딩도 안 끝남)
-    pub fn needs_onboarding(&self) -> bool {
-        !self.config.onboarding_done
-            && self.config.account.is_none()
-            && self.config.nebula_account.is_none()
-    }
-
     /// Nebulya 로그인 (블로킹 join — 기존 토큰 갱신과 같은 방식)
     pub fn nebula_login(&mut self) {
         let http = self.http.clone();
@@ -645,10 +638,9 @@ impl NebulyaApp {
         if self.launching {
             return;
         }
-        if self.config.account.is_none() && self.config.nebula_account.is_none() {
-            self.status = "먼저 로그인하세요 (Microsoft 또는 Nebulya)".into();
-            self.log("실행 거부: 로그인된 계정 없음");
-            return;
+        // 로그인은 필요한 사람만: 계정이 없어도 게스트 오프라인으로 실행
+        if self.config.username.trim().is_empty() {
+            self.config.username = "Player".to_string();
         }
         let Some(inst) = self.selected_instance().cloned() else {
             self.status = "인스턴스가 없습니다".into();
@@ -696,8 +688,11 @@ impl NebulyaApp {
                     None,
                 )
             } else {
-                send(LaunchOutcome::Failed("로그인된 계정이 없습니다".into()));
-                return;
+                // 게스트 실행 (로그인 없음)
+                (
+                    crate::minecraft::auth::MinecraftSession::offline(&config.username),
+                    None,
+                )
             };
             if session.offline && config.account.is_some() {
                 send(LaunchOutcome::Failed(
@@ -796,7 +791,7 @@ impl eframe::App for NebulyaApp {
         // 백그라운드 실행 결과 반영
         self.poll_launch();
 
-        // 커스텀 타이틀바 (온보딩 게이트보다 먼저 렌더링)
+        // 커스텀 타이틀바 (가장 먼저 렌더링)
         self.render_titlebar(ctx);
 
         // 실행 직후 숨기기 옵션
@@ -813,14 +808,6 @@ impl eframe::App for NebulyaApp {
                     self.status = p.step.clone();
                 }
             }
-        }
-
-        // 첫 실행 온보딩 게이트: 로그인 전에는 다른 화면을 보여주지 않음
-        if self.needs_onboarding() {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                crate::ui::screens::onboarding::show(self, ui);
-            });
-            return;
         }
 
         // 좌측 사이드바 — 별빛 내비게이션

@@ -76,8 +76,9 @@ fn account_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 }
                 if theme::danger_button(ui, "로그아웃").clicked() {
                     app.config.account = None;
+                    app.config.onboarding_done = false;
                     app.persist();
-                    app.status = "로그아웃됨 (오프라인 모드)".to_string();
+                    app.status = "로그아웃됨".to_string();
                 }
             });
         } else {
@@ -129,15 +130,6 @@ fn account_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     ui.spinner();
                 }
             }
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                ui.label("닉네임 (오프라인)");
-                if ui.text_edit_singleline(&mut app.config.username).changed()
-                    && app.config.username.trim().is_empty()
-                {
-                    app.config.username = "Player".to_string();
-                }
-            });
         }
     });
 }

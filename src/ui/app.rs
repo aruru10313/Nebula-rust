@@ -249,14 +249,6 @@ impl NebulyaApp {
         !self.config.onboarding_done && self.config.account.is_none()
     }
 
-    /// 오프라인으로 온보딩 완료
-    pub fn complete_onboarding_offline(&mut self) {
-        self.config.onboarding_done = true;
-        self.persist();
-        self.status = format!("오프라인 모드로 시작 ({})", self.config.username);
-        self.log("오프라인 모드로 시작");
-    }
-
     pub fn log(&mut self, msg: impl Into<String>) {
         self.logs.push(msg.into());
         if self.logs.len() > 500 {
@@ -320,9 +312,14 @@ impl NebulyaApp {
         }
     }
 
-    /// 플레이 버튼
+    /// 플레이 버튼 (정품 전용: 계정 없으면 실행 불가)
     pub fn launch(&mut self) {
         if self.launching {
+            return;
+        }
+        if self.config.account.is_none() {
+            self.status = "먼저 Microsoft 정품 로그인을 하세요".into();
+            self.log("실행 거부: 정품 계정 없음");
             return;
         }
         let Some(mut inst) = self.selected_instance().cloned() else {
@@ -330,7 +327,7 @@ impl NebulyaApp {
             return;
         };
         let config = self.config.clone();
-        // 정품 계정이 있으면 갱신 시도, 없거나 실패하면 오프라인
+        // 정품 세션 확보 (갱신 실패 시 실행하지 않음 — 오프라인 폴백 없음)
         let (session, refreshed) = self
             .runtime
             .block_on(crate::minecraft::auth::ensure_session(
@@ -345,8 +342,10 @@ impl NebulyaApp {
             self.persist();
             self.log("정품 토큰 자동 갱신됨");
         }
-        if session.offline && self.config.account.is_some() {
-            self.log("정품 갱신 실패 — 오프라인으로 실행합니다");
+        if session.offline {
+            self.status = "정품 세션 갱신 실패 — 설정에서 다시 로그인하세요".into();
+            self.log("실행 거부: 정품 세션 없음");
+            return;
         }
         self.launching = true;
         self.status = format!("실행 준비 중... ({})", inst.display_version());

@@ -73,6 +73,53 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
 
     ui.add_space(12.0);
 
+    // ---- 내 인스턴스 바로가기 ----
+    if !app.instances.is_empty() {
+        theme::section_header(ui, "▦", "내 인스턴스", "클릭해서 선택");
+        ui.add_space(4.0);
+        let current = app
+            .config
+            .selected_instance
+            .clone()
+            .or_else(|| app.instances.first().map(|i| i.id.clone()));
+        ui.horizontal_wrapped(|ui| {
+            for inst in app.instances.clone() {
+                let selected = current.as_deref() == Some(inst.id.as_str());
+                let frame = if selected {
+                    theme::glow_card_frame()
+                } else {
+                    theme::tile_frame()
+                };
+                let r = frame.show(ui, |ui| {
+                    ui.set_min_size(egui::vec2(210.0, 62.0));
+                    ui.label(egui::RichText::new(&inst.name).size(14.0).strong());
+                    ui.label(
+                        egui::RichText::new(inst.display_version())
+                            .size(11.0)
+                            .color(theme::TEXT_DIM),
+                    );
+                    ui.label(
+                        egui::RichText::new(format!("★ {}회 항해", inst.total_plays))
+                            .size(11.0)
+                            .color(theme::NEBULA_LIGHT),
+                    );
+                });
+                if ui
+                    .interact(
+                        r.response.rect,
+                        egui::Id::new(("instance_card", &inst.id)),
+                        egui::Sense::click(),
+                    )
+                    .clicked()
+                {
+                    app.config.selected_instance = Some(inst.id.clone());
+                    app.persist();
+                }
+            }
+        });
+        ui.add_space(12.0);
+    }
+
     // ---- 스탯 타일 3개 ----
     let (plays, mods_count, java_short) = {
         let plays = app

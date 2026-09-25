@@ -183,6 +183,35 @@ jobs:
           Move-Item -LiteralPath $setup -Destination "dist\windows\Nebulya-Launcher-Setup-$version-windows-x86_64.exe"
           Get-ChildItem -File dist\windows | Format-Table Name, Length
 
+      - name: Sign Windows binaries (optional)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrEmpty($env:WINDOWS_CERT_BASE64)) {
+            Write-Output "서명용 인증서 없음 — 서명을 건너뜁니다 (docs/SIGNING.md 참고)"
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'nebulya-sign.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_BASE64))
+          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString $env:WINDOWS_CERT_PASSWORD -AsPlainText -Force)
+          Remove-Item -Force $pfx
+          $signtool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'x64' } | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { throw "signtool을 찾을 수 없습니다" }
+          $version = '${{ steps.package-version.outputs.version }}'
+          foreach ($f in @(
+            "dist\windows\nebulya-launcher-$version-windows-x86_64.exe",
+            "dist\windows\Nebulya-Launcher-Setup-$version-windows-x86_64.exe"
+          )) {
+            & $signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /sha1 $cert.Thumbprint "$f"
+            & $signtool verify /pa "$f"
+          }
+          Write-Output "서명 완료: $($cert.Subject)"
+
       - name: Upload files to draft release
         shell: bash
         env:

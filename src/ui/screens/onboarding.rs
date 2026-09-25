@@ -122,22 +122,18 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         theme::star_divider(ui);
         ui.add_space(6.0);
 
-        // 오프라인 시작
-        ui.horizontal(|ui| {
-            ui.label("닉네임");
-            ui.add(egui::TextEdit::singleline(&mut app.config.username).desired_width(200.0));
-            if theme::ghost_button(ui, "오프라인으로 시작").clicked() {
-                if app.config.username.trim().is_empty() {
-                    app.config.username = "Player".to_string();
-                }
-                app.complete_onboarding_offline();
-            }
-        });
+        // 정품 전용: 오프라인 시작 없음
         ui.label(
-            egui::RichText::new("오프라인 모드에서는 정품 서버에 접속할 수 없습니다")
+            egui::RichText::new("정품 Minecraft: Java Edition이 필요합니다")
                 .color(theme::TEXT_FAINT)
                 .size(11.0),
         );
+        ui.label(
+            egui::RichText::new("정품 Minecraft: Java Edition이 필요합니다")
+                .color(theme::TEXT_FAINT)
+                .size(11.0),
+        );
+        ui.add_space(20.0);
         ui.add_space(20.0);
     });
 }

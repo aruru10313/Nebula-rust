@@ -242,6 +242,25 @@ fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         });
         ui.add_space(2.0);
         ui.horizontal(|ui| {
+            ui.label(format!("현재 버전: v{}", env!("CARGO_PKG_VERSION")));
+            if ui.small_button("업데이트 확인").clicked() {
+                app.check_update_now();
+            }
+            if let Some(info) = app.update_info.clone() {
+                if theme::accent_button(ui, &format!("v{}로 업데이트", info.version)).clicked() {
+                    app.apply_update();
+                }
+            }
+        });
+        if !app.update_status.is_empty() {
+            ui.label(
+                egui::RichText::new(&app.update_status)
+                    .color(theme::TEXT_DIM)
+                    .size(11.0),
+            );
+        }
+        ui.add_space(2.0);
+        ui.horizontal(|ui| {
             ui.monospace(format!("{}", app.config.game_root.display()));
             if ui.small_button("폴더 열기").clicked() {
                 let _ = open::that(&app.config.game_root);

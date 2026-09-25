@@ -2,6 +2,7 @@ use crate::core::{instance, Instance, LauncherConfig};
 use crate::minecraft::auth::LoginState;
 use crate::minecraft::discord::DiscordPresence;
 use crate::minecraft::launcher::LaunchProgress;
+use crate::minecraft::update::UpdateInfo;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -49,6 +50,9 @@ pub struct NebulyaApp {
     pub mods_ui: crate::ui::screens::mods::ModsUiState,
     pub discord: DiscordPresence,
     pub login_state: Arc<Mutex<LoginState>>,
+    pub update_info: Option<UpdateInfo>,
+    pub update_status: String,
+    update_result: Arc<Mutex<Option<Result<Option<UpdateInfo>, String>>>>,
     pub runtime: tokio::runtime::Runtime,
     pub http: reqwest::Client,
     progress_state: Arc<Mutex<Option<LaunchProgress>>>,
@@ -93,6 +97,9 @@ impl NebulyaApp {
             mods_ui: crate::ui::screens::mods::ModsUiState::default(),
             discord,
             login_state: Arc::new(Mutex::new(LoginState::Idle)),
+            update_info: None,
+            update_status: String::new(),
+            update_result: Arc::new(Mutex::new(None)),
             runtime,
             http,
             progress_state: Arc::new(Mutex::new(None)),
@@ -101,6 +108,7 @@ impl NebulyaApp {
         app.persist();
         let user = app.config.username.clone();
         app.discord.show_home(&user);
+        app.check_update_now();
         app
     }
 
@@ -242,6 +250,70 @@ impl NebulyaApp {
     pub fn cancel_ms_login(&mut self) {
         *self.login_state.lock().unwrap() = LoginState::Idle;
         self.status = "로그인 취소됨".to_string();
+    }
+
+    /// 업데이트 확인 (백그라운드, 결과는 다음 프레임에 반영)
+    pub fn check_update_now(&mut self) {
+        self.update_status = "업데이트 확인 중...".to_string();
+        let http = self.http.clone();
+        let slot = self.update_result.clone();
+        let current = env!("CARGO_PKG_VERSION").to_string();
+        std::thread::spawn(move || {
+            let res = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt
+                    .block_on(crate::minecraft::update::check_for_update(&http, &current))
+                    .map_err(|e| format!("확인 실패: {e:#}")),
+                Err(e) => Err(format!("런타임 오류: {e}")),
+            };
+            *slot.lock().unwrap() = Some(res);
+        });
+    }
+
+    /// 업데이트 적용 (Windows: Setup 실행 후 종료 / 그 외: 릴리스 페이지 열기)
+    pub fn apply_update(&mut self) {
+        let Some(info) = self.update_info.clone() else {
+            return;
+        };
+        #[cfg(windows)]
+        if let Some(url) = info.setup_url.clone() {
+            self.update_status = "설치기를 내려받는 중...".to_string();
+            let http = self.http.clone();
+            let slot = self.update_result.clone();
+            std::thread::spawn(move || {
+                match crate::minecraft::update::download_and_run_setup(&http, &url) {
+                    Ok(()) => std::process::exit(0),
+                    Err(e) => {
+                        *slot.lock().unwrap() = Some(Err(format!("업데이트 실패: {e:#}")));
+                    }
+                }
+            });
+            return;
+        }
+        let _ = open::that(&info.page_url);
+    }
+
+    fn poll_update_result(&mut self) {
+        if let Ok(mut slot) = self.update_result.lock() {
+            if let Some(res) = slot.take() {
+                match res {
+                    Ok(Some(info)) => {
+                        self.update_status = format!("새 버전 v{} 사용 가능", info.version);
+                        self.log(format!("업데이트 발견: v{}", info.version));
+                        self.update_info = Some(info);
+                    }
+                    Ok(None) => {
+                        self.update_info = None;
+                        self.update_status = "최신 버전입니다".to_string();
+                    }
+                    Err(e) => {
+                        self.update_status = e;
+                    }
+                }
+            }
+        }
     }
 
     /// 첫 실행 온보딩이 필요한지 (계정도 없고 온보딩도 안 끝남)
@@ -418,6 +490,8 @@ impl eframe::App for NebulyaApp {
         ctx.set_visuals(crate::ui::theme::dark_visuals());
         // MS 로그인 상태 반영
         self.poll_login_state();
+        // 업데이트 확인 결과 반영
+        self.poll_update_result();
         // progress 상태 동기화
         if let Ok(guard) = self.progress_state.lock() {
             if guard.is_some() {

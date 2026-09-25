@@ -8,4 +8,5 @@ pub mod java;
 pub mod launcher;
 pub mod modrinth;
 pub mod mods;
+pub mod update;
 pub mod version;

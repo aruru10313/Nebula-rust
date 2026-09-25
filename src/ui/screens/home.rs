@@ -4,6 +4,33 @@ use crate::ui::NebulyaApp;
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 
+    // ---- 새 버전 배너 ----
+    if let Some(info) = app.update_info.clone() {
+        theme::glow_card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(format!("★ 새 버전 v{} 사용 가능", info.version))
+                        .size(14.0)
+                        .strong()
+                        .color(theme::STARLIGHT),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if theme::accent_button(ui, "지금 업데이트").clicked() {
+                        app.apply_update();
+                    }
+                });
+            });
+            if !app.update_status.is_empty() {
+                ui.label(
+                    egui::RichText::new(&app.update_status)
+                        .size(11.0)
+                        .color(theme::TEXT_DIM),
+                );
+            }
+        });
+        ui.add_space(12.0);
+    }
+
     // ---- 풀블리드 성운 히어로 ----
     let avail = ui.available_width();
     let hero_h = 248.0;

@@ -140,7 +140,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     theme::tile_frame()
                 };
                 let r = frame.show(ui, |ui| {
-                    ui.set_min_size(egui::vec2(210.0, 88.0));
+                    ui.set_min_size(egui::vec2(210.0, 96.0));
                     ui.label(egui::RichText::new(&inst.name).size(14.0).strong());
                     ui.label(
                         egui::RichText::new(inst.display_version())
@@ -152,30 +152,31 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                             .size(11.0)
                             .color(theme::NEBULA_LIGHT),
                     );
+                    ui.add_space(2.0);
+                    ui.horizontal(|ui| {
+                        if selected {
+                            theme::badge(ui, "선택됨", theme::NEBULA_LIGHT);
+                        } else if ui.small_button("선택").clicked() {
+                            app.config.selected_instance = Some(inst.id.clone());
+                            app.persist();
+                        }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.small_button("▶").clicked() && !app.launching {
+                                app.config.selected_instance = Some(inst.id.clone());
+                                app.persist();
+                                app.launch();
+                            }
+                        });
+                    });
                 });
-                let clicked = ui
+                if ui
                     .interact(
                         r.response.rect,
                         egui::Id::new(("instance_card", &inst.id)),
                         egui::Sense::click(),
                     )
-                    .clicked();
-                ui.horizontal(|ui| {
-                    if selected {
-                        theme::badge(ui, "선택됨", theme::NEBULA_LIGHT);
-                    } else if ui.small_button("선택").clicked() {
-                        app.config.selected_instance = Some(inst.id.clone());
-                        app.persist();
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.small_button("▶").clicked() && !app.launching {
-                            app.config.selected_instance = Some(inst.id.clone());
-                            app.persist();
-                            app.launch();
-                        }
-                    });
-                });
-                if clicked {
+                    .clicked()
+                {
                     app.config.selected_instance = Some(inst.id.clone());
                     app.persist();
                 }

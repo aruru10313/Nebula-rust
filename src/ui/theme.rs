@@ -143,6 +143,20 @@ pub fn ghost_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     ui.add(btn)
 }
 
+/// 작은 주 버튼 (상단바·카드용)
+pub fn small_accent_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
+    let btn = egui::Button::new(
+        egui::RichText::new(label)
+            .strong()
+            .color(Color32::WHITE)
+            .size(13.0),
+    )
+    .fill(NEBULA)
+    .corner_radius(CornerRadius::same(10))
+    .min_size(egui::vec2(120.0, 34.0));
+    ui.add(btn)
+}
+
 /// 위험 버튼: 삭제 등
 pub fn danger_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     let btn = egui::Button::new(egui::RichText::new(label).color(Color32::WHITE).size(13.0))

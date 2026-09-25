@@ -915,27 +915,39 @@ impl eframe::App for NebulyaApp {
                         );
                     });
                     ui.add_space(6.0);
-                    // 유저 카드 (계정 상태만 표시)
+                    // 유저 카드 (아바타 + 이름 + 상태)
                     crate::ui::theme::tile_frame().show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(
-                                egui::RichText::new("★")
-                                    .size(20.0)
-                                    .color(crate::ui::theme::STAR_PINK),
+                            let display_name = self
+                                .config
+                                .account
+                                .as_ref()
+                                .map(|a| a.username.clone())
+                                .or_else(|| {
+                                    self.config
+                                        .nebula_account
+                                        .as_ref()
+                                        .map(|a| a.username.clone())
+                                })
+                                .unwrap_or_else(|| self.config.username.clone());
+                            let initial = display_name.chars().next().unwrap_or('★');
+                            let (avatar, _) = ui
+                                .allocate_exact_size(egui::vec2(34.0, 34.0), egui::Sense::hover());
+                            ui.painter().circle_filled(
+                                avatar.center(),
+                                16.0,
+                                crate::ui::theme::NEBULA,
                             );
+                            ui.scope_builder(egui::UiBuilder::new().max_rect(avatar), |ui| {
+                                ui.centered_and_justified(|ui| {
+                                    ui.label(
+                                        egui::RichText::new(initial.to_string())
+                                            .strong()
+                                            .color(egui::Color32::WHITE),
+                                    );
+                                });
+                            });
                             ui.vertical(|ui| {
-                                let display_name = self
-                                    .config
-                                    .account
-                                    .as_ref()
-                                    .map(|a| a.username.clone())
-                                    .or_else(|| {
-                                        self.config
-                                            .nebula_account
-                                            .as_ref()
-                                            .map(|a| a.username.clone())
-                                    })
-                                    .unwrap_or_else(|| self.config.username.clone());
                                 ui.label(egui::RichText::new(&display_name).size(13.0).strong());
                                 if self.config.account.is_some() {
                                     ui.label(
@@ -1012,7 +1024,7 @@ impl eframe::App for NebulyaApp {
                         } else {
                             "▶  플레이"
                         };
-                        let resp = crate::ui::theme::accent_button(ui, btn_label);
+                        let resp = crate::ui::theme::small_accent_button(ui, btn_label);
                         if resp.clicked() && !self.launching {
                             self.launch();
                         }

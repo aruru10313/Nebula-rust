@@ -1,4 +1,3 @@
-use crate::core::Instance;
 use crate::ui::theme;
 use crate::ui::NebulyaApp;
 

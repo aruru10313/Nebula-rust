@@ -1146,13 +1146,22 @@ impl eframe::App for NebulyaApp {
                 });
             });
 
-        // 중앙 컨텐츠
-        egui::CentralPanel::default().show(ctx, |ui| match self.tab {
-            Tab::Home => crate::ui::screens::home::show(self, ui),
-            Tab::Instances => crate::ui::screens::instances::show(self, ui),
-            Tab::Mods => crate::ui::screens::mods::show(self, ui),
-            Tab::Account => crate::ui::screens::account::show(self, ui),
-            Tab::Settings => crate::ui::screens::settings::show(self, ui),
+        // 중앙 컨텐츠 — 창이 낮아도 잘리지 않게 전체 스크롤
+        egui::CentralPanel::default().show(ctx, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    // 가로 폭은 그대로 쓰고 세로만 스크롤
+                    ui.set_width(ui.available_width());
+                    match self.tab {
+                        Tab::Home => crate::ui::screens::home::show(self, ui),
+                        Tab::Instances => crate::ui::screens::instances::show(self, ui),
+                        Tab::Mods => crate::ui::screens::mods::show(self, ui),
+                        Tab::Account => crate::ui::screens::account::show(self, ui),
+                        Tab::Settings => crate::ui::screens::settings::show(self, ui),
+                    }
+                    ui.add_space(16.0);
+                });
         });
 
         // 하단 상태바 — 별빛 상태

@@ -1,4 +1,4 @@
-﻿//! 모드 화면: Modrinth / CurseForge 검색 + 설치 + 관리 (Fabric 전용)
+//! 모드 화면: Modrinth / CurseForge 검색 + 설치 + 관리 (Fabric 전용)
 //!
 //! - 검색 결과는 선택된 인스턴스의 MC 버전과 Fabric 로더 기준으로 필터됨
 //! - 설치된 모드는 `instances/<id>/mods/*.jar` 가 실제 기준,
@@ -406,16 +406,21 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.label(egui::RichText::new(mc).color(crate::ui::theme::TEXT_DIM));
     ui.add_space(6.0);
 
-    // 제공자 선택 + 검색창
-    ui.horizontal(|ui| {
+    // 제공자 선택 + 검색창 (좁은 창에서도 찌그러지지 않게 2행)
+    ui.horizontal_wrapped(|ui| {
         for p in [ModProvider::Modrinth, ModProvider::CurseForge] {
             let selected = app.mods_ui.provider == p;
             if ui.selectable_label(selected, p.label()).clicked() {
                 app.mods_ui.provider = p;
             }
         }
-        ui.add_space(8.0);
-        let resp = ui.text_edit_singleline(&mut app.mods_ui.query);
+    });
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        let resp = ui.add_sized(
+            [ui.available_width() - 100.0, 24.0],
+            egui::TextEdit::singleline(&mut app.mods_ui.query).hint_text("모드 검색..."),
+        );
         if resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
             app.search_mods_now();
         }

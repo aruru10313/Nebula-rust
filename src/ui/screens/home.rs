@@ -206,7 +206,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             .join(".");
         (plays, mods_count, short)
     };
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         theme::stat_tile(ui, "🚀", &plays, "항해 횟수", theme::NEBULA_LIGHT);
         theme::stat_tile(ui, "◆", &mods_count, "탑재 모드", theme::STAR_PINK);
         theme::stat_tile(

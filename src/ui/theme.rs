@@ -207,6 +207,17 @@ pub fn star_divider(ui: &mut egui::Ui) {
     });
 }
 
+/// 폼 두 칸 행: 왼쪽 고정 라벨 + 오른쪽 컨텐츠 (줄 맞춤용)
+pub fn form_row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
+    ui.horizontal(|ui| {
+        ui.add_sized(
+            [130.0, 20.0],
+            egui::Label::new(egui::RichText::new(label).color(TEXT_DIM)),
+        );
+        add(ui);
+    });
+}
+
 /// 작은 알약 배지 (버전/상태 표시)
 pub fn badge(ui: &mut egui::Ui, text: &str, color: Color32) {
     egui::Frame::new()

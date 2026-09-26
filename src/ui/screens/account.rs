@@ -149,22 +149,19 @@ fn nebula_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 }
             });
             ui.add_space(2.0);
-            ui.horizontal(|ui| {
-                ui.label("이메일");
+            theme::form_row(ui, "이메일", |ui| {
                 ui.text_edit_singleline(&mut app.nebula_email);
             });
-            ui.horizontal(|ui| {
-                ui.label("비밀번호");
+            theme::form_row(ui, "비밀번호", |ui| {
                 ui.add(egui::TextEdit::singleline(&mut app.nebula_password).password(true));
             });
             if app.nebula_mode_signup {
                 if app.nebula_pending_verify {
-                    ui.horizontal(|ui| {
-                        ui.label("인증 코드");
+                    theme::form_row(ui, "인증 코드", |ui| {
                         ui.text_edit_singleline(&mut app.nebula_code);
                     });
                     ui.horizontal(|ui| {
-                        if theme::accent_button(ui, "인증 확인").clicked() {
+                        if theme::small_accent_button(ui, "인증 확인").clicked() {
                             app.nebula_verify();
                         }
                         if ui.small_button("코드 재전송").clicked() {
@@ -172,8 +169,7 @@ fn nebula_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                         }
                     });
                 } else {
-                    ui.horizontal(|ui| {
-                        ui.label("닉네임");
+                    theme::form_row(ui, "닉네임", |ui| {
                         ui.text_edit_singleline(&mut app.nebula_username);
                     });
                     ui.add_space(2.0);

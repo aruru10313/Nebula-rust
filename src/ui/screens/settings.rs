@@ -1,4 +1,4 @@
-use crate::ui::theme;
+﻿use crate::ui::theme;
 use crate::ui::NebulyaApp;
 
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
@@ -33,22 +33,13 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     });
 }
 
-/// 두 칸 행: 왼쪽 고정 라벨 + 오른쪽 컨텐츠
-fn row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
-    ui.horizontal(|ui| {
-        ui.add_sized(
-            [150.0, 20.0],
-            egui::Label::new(egui::RichText::new(label).color(theme::TEXT_DIM)),
-        );
-        add(ui);
-    });
-}
+use crate::ui::theme::form_row;
 
 // ---- 1. 게임 ----
 fn game_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
         theme::section_header(ui, "☕", "게임", "Java · 메모리 · 화면");
-        row(ui, "Java 경로", |ui| {
+        form_row(ui, "Java 경로", |ui| {
             ui.text_edit_singleline(&mut app.config.java_path);
             if ui.small_button("찾기").clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_file() {
@@ -60,7 +51,7 @@ fn game_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             }
         });
         ui.horizontal(|ui| {
-            ui.add_space(150.0);
+            ui.add_space(130.0);
             ui.label(
                 egui::RichText::new(if app.java_install_status.is_empty() {
                     "비우면 자동탐지 · 자동 설치는 Adoptium JRE 21"
@@ -72,21 +63,21 @@ fn game_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             );
         });
         ui.add_space(6.0);
-        row(ui, "최대 RAM", |ui| {
+        form_row(ui, "최대 RAM", |ui| {
             ui.add(
                 egui::Slider::new(&mut app.config.ram_mb, 1024..=16384)
                     .step_by(256.0)
                     .suffix(" MB"),
             );
         });
-        row(ui, "최소 RAM", |ui| {
+        form_row(ui, "최소 RAM", |ui| {
             ui.add(
                 egui::Slider::new(&mut app.config.min_ram_mb, 512..=4096)
                     .step_by(256.0)
                     .suffix(" MB"),
             );
         });
-        row(ui, "해상도", |ui| {
+        form_row(ui, "해상도", |ui| {
             ui.add(egui::DragValue::new(&mut app.config.width).range(640..=3840));
             ui.label("x");
             ui.add(egui::DragValue::new(&mut app.config.height).range(480..=2160));
@@ -106,11 +97,11 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 .size(12.0),
         );
         ui.add_space(2.0);
-        row(ui, "CurseForge API 키", |ui| {
+        form_row(ui, "CurseForge API 키", |ui| {
             ui.text_edit_singleline(&mut app.config.curseforge_api_key);
         });
         ui.add_space(4.0);
-        row(ui, "Discord 상태", |ui| {
+        form_row(ui, "Discord 상태", |ui| {
             ui.checkbox(&mut app.config.discord_enabled, "표시");
             let (dot, txt) =
                 if !app.config.discord_enabled || app.config.discord_client_id.trim().is_empty() {
@@ -134,7 +125,7 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 app.status = "Discord 재연결 시도".to_string();
             }
         });
-        row(ui, "Discord App ID", |ui| {
+        form_row(ui, "Discord App ID", |ui| {
             ui.text_edit_singleline(&mut app.config.discord_client_id);
         });
     });
@@ -144,7 +135,7 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
 fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
         theme::section_header(ui, "≡", "고급", "버전 · 저장 위치");
-        row(ui, "현재 버전", |ui| {
+        form_row(ui, "현재 버전", |ui| {
             ui.label(format!("v{}", env!("CARGO_PKG_VERSION")));
             if ui.small_button("업데이트 확인").clicked() {
                 app.check_update_now();
@@ -158,7 +149,7 @@ fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         });
         if !app.update_status.is_empty() {
             ui.horizontal(|ui| {
-                ui.add_space(150.0);
+                ui.add_space(130.0);
                 ui.label(
                     egui::RichText::new(&app.update_status)
                         .color(theme::TEXT_DIM)
@@ -167,7 +158,7 @@ fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             });
         }
         ui.add_space(2.0);
-        row(ui, "저장 위치", |ui| {
+        form_row(ui, "저장 위치", |ui| {
             ui.monospace(format!("{}", app.config.game_root.display()));
             if ui.small_button("폴더 열기").clicked() {
                 let _ = open::that(&app.config.game_root);

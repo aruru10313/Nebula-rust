@@ -1301,7 +1301,8 @@ impl eframe::App for NebulyaApp {
             }
         }
 
-        ctx.request_repaint_after(std::time::Duration::from_millis(250));
+        // 폴링 주기에 맞춰 다시 그리기 (유휴 CPU 절약: 500ms)
+        ctx.request_repaint_after(std::time::Duration::from_millis(500));
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

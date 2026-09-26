@@ -351,7 +351,8 @@ impl NebulyaApp {
                     for m in e.mods.iter_mut() {
                         if m.file_name == file_name {
                             m.file_name = new_name.clone();
-                            m.enabled = !file_name.ends_with(".disabled");
+                            // ".disabled"를 뗐으면 켜진 것, 붙였으면 꺼진 것
+                            m.enabled = file_name.ends_with(".disabled");
                         }
                     }
                 }

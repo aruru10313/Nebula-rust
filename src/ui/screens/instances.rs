@@ -1,3 +1,4 @@
+use crate::core::Instance;
 use crate::ui::theme;
 use crate::ui::NebulyaApp;
 
@@ -56,14 +57,20 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     );
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if theme::danger_button(ui, "삭제").clicked() {
+                    if ui.small_button("삭제").clicked() {
                         app.confirm_delete_instance = Some(inst.id.clone());
                     }
-                    if ui.button("▶ 실행").clicked() {
+                    if ui.small_button("폴더").clicked() {
+                        let _ = open::that(inst.game_dir(&app.config.game_root));
+                    }
+                    if ui.small_button("복제").clicked() {
+                        app.duplicate_instance(&inst.id);
+                    }
+                    if ui.small_button("▶ 실행").clicked() {
                         app.config.selected_instance = Some(inst.id.clone());
                         app.launch();
                     }
-                    if !selected && ui.button("선택").clicked() {
+                    if !selected && ui.small_button("선택").clicked() {
                         app.config.selected_instance = Some(inst.id.clone());
                     }
                 });

@@ -328,43 +328,39 @@ impl NebulyaApp {
                                 .color(crate::ui::theme::TEXT_DIM),
                         );
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui
-                                .small_button(
-                                    egui::RichText::new("×")
-                                        .size(14.0)
-                                        .color(crate::ui::theme::TEXT_DIM),
-                                )
-                                .clicked()
-                            {
+                            if crate::ui::theme::titlebar_button(ui, "×", true).clicked() {
                                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                             }
-                            if ui
-                                .small_button(
-                                    egui::RichText::new("＋")
-                                        .size(13.0)
-                                        .color(crate::ui::theme::TEXT_DIM),
-                                )
-                                .clicked()
-                            {
+                            if crate::ui::theme::titlebar_button(ui, "＋", false).clicked() {
                                 self.maximized = !self.maximized;
                                 ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(
                                     self.maximized,
                                 ));
                             }
-                            if ui
-                                .small_button(
-                                    egui::RichText::new("–")
-                                        .size(13.0)
-                                        .color(crate::ui::theme::TEXT_DIM),
-                                )
-                                .clicked()
-                            {
+                            if crate::ui::theme::titlebar_button(ui, "–", false).clicked() {
                                 ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
                             }
                         });
                     });
                 });
             });
+    }
+
+    /// 인스턴스 복제 (설정만 복사, 플레이 기록·모드는 새로 시작)
+    pub fn duplicate_instance(&mut self, id: &str) {
+        if let Some(src) = self.instances.iter().find(|i| i.id == id).cloned() {
+            let mut inst = Instance::new_fabric(
+                format!("{} 복사", src.name),
+                src.minecraft_version.clone(),
+                src.loader_version.clone(),
+            );
+            inst.loader = src.loader;
+            self.config.selected_instance = Some(inst.id.clone());
+            self.instances.push(inst);
+            self.persist();
+            self.status = "인스턴스 복제됨".to_string();
+            self.log("인스턴스 복제됨");
+        }
     }
 
     /// Microsoft 로그인 취소 (다음 폴링 사이클에서 스레드 종료)

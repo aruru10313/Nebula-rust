@@ -157,6 +157,24 @@ pub fn small_accent_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     ui.add(btn)
 }
 
+/// 타이틀바 창 버튼 (규격 통일 46x32, 닫기는 붉은 기운)
+pub fn titlebar_button(ui: &mut egui::Ui, label: &str, close: bool) -> egui::Response {
+    let fill = if close {
+        Color32::from_rgba_unmultiplied(248, 113, 113, 22)
+    } else {
+        Color32::TRANSPARENT
+    };
+    let btn = egui::Button::new(egui::RichText::new(label).size(14.0).color(if close {
+        DANGER
+    } else {
+        TEXT_DIM
+    }))
+    .fill(fill)
+    .corner_radius(CornerRadius::same(6))
+    .min_size(egui::vec2(46.0, 32.0));
+    ui.add_sized([46.0, 32.0], btn)
+}
+
 /// 위험 버튼: 삭제 등
 pub fn danger_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     let btn = egui::Button::new(egui::RichText::new(label).color(Color32::WHITE).size(13.0))

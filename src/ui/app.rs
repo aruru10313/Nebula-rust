@@ -1182,10 +1182,10 @@ impl eframe::App for NebulyaApp {
                         });
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
-                        if ui.button("취소").clicked() {
+                        if crate::ui::theme::ghost_button(ui, "취소").clicked() {
                             self.show_new_instance = false;
                         }
-                        if crate::ui::theme::accent_button(ui, "생성").clicked() {
+                        if crate::ui::theme::small_accent_button(ui, "생성").clicked() {
                             let inst = Instance::new_fabric(
                                 self.new_instance_name.clone(),
                                 self.new_mc_version.clone(),

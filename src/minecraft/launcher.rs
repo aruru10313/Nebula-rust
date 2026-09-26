@@ -44,7 +44,8 @@ pub async fn prepare_and_launch(
         }
         Err(e) => {
             tracing::warn!("매니페스트 조회 실패, 캐시 사용: {e:#}");
-            load_cache(&manifest_path).context("오프라인 상태이며 버전 캐시가 없습니다")?
+            load_cache(&manifest_path)
+                .context("첫 실행은 온라인 필요 — 인터넷 연결 후 다시 실행")?
         }
     };
     let entry = manifest
@@ -56,17 +57,18 @@ pub async fn prepare_and_launch(
         .join("versions")
         .join(&instance.minecraft_version)
         .join(format!("{}.json", instance.minecraft_version));
-    let mut version_json =
-        match crate::minecraft::version::fetch_version_json(&client, &entry.url).await {
-            Ok(v) => {
-                let _ = save_cache(&version_path, &v);
-                v
-            }
-            Err(e) => {
-                tracing::warn!("버전 JSON 조회 실패, 캐시 사용: {e:#}");
-                load_cache(&version_path).context("오프라인 상태이며 버전 캐시가 없습니다")?
-            }
-        };
+    let mut version_json = match crate::minecraft::version::fetch_version_json(&client, &entry.url)
+        .await
+    {
+        Ok(v) => {
+            let _ = save_cache(&version_path, &v);
+            v
+        }
+        Err(e) => {
+            tracing::warn!("버전 JSON 조회 실패, 캐시 사용: {e:#}");
+            load_cache(&version_path).context("첫 실행은 온라인 필요 — 인터넷 연결 후 다시 실행")?
+        }
+    };
 
     let game_dir = instance.game_dir(root);
     std::fs::create_dir_all(&game_dir)?;
@@ -106,7 +108,8 @@ pub async fn prepare_and_launch(
             }
             Err(e) => {
                 tracing::warn!("Fabric 메타 조회 실패, 캐시 사용: {e:#}");
-                load_cache(&meta_path).context("오프라인 상태이며 Fabric 캐시가 없습니다")?
+                load_cache(&meta_path)
+                    .context("첫 실행은 온라인 필요 — 인터넷 연결 후 다시 실행")?
             }
         };
 

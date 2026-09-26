@@ -813,7 +813,7 @@ impl NebulyaApp {
             };
             if session.offline && config.account.is_some() {
                 send(LaunchOutcome::Failed(
-                    "정품 세션 갱신 실패 — 계정 탭에서 다시 로그인하세요".into(),
+                    "정품 세션 만료 — 계정 탭에서 다시 로그인하세요".into(),
                 ));
                 return;
             }
@@ -971,45 +971,53 @@ impl eframe::App for NebulyaApp {
                 crate::ui::theme::star_divider(ui);
                 ui.add_space(6.0);
 
-                for tab in [
-                    Tab::Home,
-                    Tab::Instances,
-                    Tab::Mods,
-                    Tab::Account,
-                    Tab::Settings,
-                ] {
-                    let selected = self.tab == tab;
-                    let label = format!("{}  {}", tab.icon(), tab.label());
-                    let rich = if selected {
-                        egui::RichText::new(label)
-                            .size(14.0)
-                            .strong()
-                            .color(egui::Color32::WHITE)
-                    } else {
-                        egui::RichText::new(label)
-                            .size(14.0)
-                            .color(crate::ui::theme::TEXT_DIM)
-                    };
-                    let mut btn = egui::Button::new(rich)
-                        .selected(selected)
-                        .min_size(egui::vec2(192.0, 40.0))
-                        .corner_radius(egui::CornerRadius::same(12));
-                    if selected {
-                        btn = btn.fill(crate::ui::theme::NEBULA);
-                    }
-                    if ui.add(btn).clicked() {
-                        self.tab = tab;
-                        // 탭 이동 시 Discord 상태 반영
-                        match tab {
-                            Tab::Settings => self.discord.show_settings(),
-                            _ => {
-                                let user = self.config.username.clone();
-                                self.discord.show_home(&user);
+                // 중간 내비만 스크롤 — 창이 낮아져도 하단 유저 카드와 겹치지 않는다.
+                let footer_reserve = 148.0;
+                let list_h = (ui.available_height() - footer_reserve).max(120.0);
+                egui::ScrollArea::vertical()
+                    .max_height(list_h)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        for tab in [
+                            Tab::Home,
+                            Tab::Instances,
+                            Tab::Mods,
+                            Tab::Account,
+                            Tab::Settings,
+                        ] {
+                            let selected = self.tab == tab;
+                            let label = format!("{}  {}", tab.icon(), tab.label());
+                            let rich = if selected {
+                                egui::RichText::new(label)
+                                    .size(14.0)
+                                    .strong()
+                                    .color(egui::Color32::WHITE)
+                            } else {
+                                egui::RichText::new(label)
+                                    .size(14.0)
+                                    .color(crate::ui::theme::TEXT_DIM)
+                            };
+                            let mut btn = egui::Button::new(rich)
+                                .selected(selected)
+                                .min_size(egui::vec2(192.0, 40.0))
+                                .corner_radius(egui::CornerRadius::same(12));
+                            if selected {
+                                btn = btn.fill(crate::ui::theme::NEBULA);
                             }
+                            if ui.add(btn).clicked() {
+                                self.tab = tab;
+                                // 탭 이동 시 Discord 상태 반영
+                                match tab {
+                                    Tab::Settings => self.discord.show_settings(),
+                                    _ => {
+                                        let user = self.config.username.clone();
+                                        self.discord.show_home(&user);
+                                    }
+                                }
+                            }
+                            ui.add_space(4.0);
                         }
-                    }
-                    ui.add_space(4.0);
-                }
+                    });
 
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
                     ui.add_space(12.0);

@@ -22,6 +22,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             theme::card_frame()
         };
         frame.show(ui, |ui| {
+            // 1단: 상태 + 정보 + 주요 액션 (실행/선택)
             ui.horizontal(|ui| {
                 // 상태 점
                 ui.label(
@@ -57,25 +58,36 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     );
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.small_button("삭제").clicked() {
-                        app.confirm_delete_instance = Some(inst.id.clone());
-                    }
-                    if ui.small_button("폴더").clicked() {
-                        let _ = open::that(inst.game_dir(&app.config.game_root));
-                    }
-                    if ui.small_button("복제").clicked() {
-                        app.duplicate_instance(&inst.id);
-                    }
-                    if ui.small_button("이름").clicked() {
-                        app.rename_instance_id = Some(inst.id.clone());
-                        app.rename_name = inst.name.clone();
-                    }
-                    if ui.small_button("▶ 실행").clicked() {
+                    if theme::small_accent_button(ui, "▶ 실행").clicked() {
                         app.config.selected_instance = Some(inst.id.clone());
                         app.launch();
                     }
                     if !selected && ui.small_button("선택").clicked() {
                         app.config.selected_instance = Some(inst.id.clone());
+                    }
+                });
+            });
+            ui.add_space(6.0);
+            // 2단: 보조 관리 액션 (오른쪽 정렬)
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("관리")
+                        .size(11.0)
+                        .color(theme::TEXT_FAINT),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.small_button("삭제").clicked() {
+                        app.confirm_delete_instance = Some(inst.id.clone());
+                    }
+                    if ui.small_button("폴더 열기").clicked() {
+                        let _ = open::that(inst.game_dir(&app.config.game_root));
+                    }
+                    if ui.small_button("복제").clicked() {
+                        app.duplicate_instance(&inst.id);
+                    }
+                    if ui.small_button("이름 변경").clicked() {
+                        app.rename_instance_id = Some(inst.id.clone());
+                        app.rename_name = inst.name.clone();
                     }
                 });
             });

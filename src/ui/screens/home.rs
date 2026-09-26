@@ -66,7 +66,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             ui.vertical_centered(|ui| {
                 ui.add_space(6.0);
                 ui.label(
-                    egui::RichText::new("MINECRAFT · FABRIC LAUNCHER")
+                    egui::RichText::new("★ S T E L L A R · F A B R I C")
                         .size(12.0)
                         .color(theme::NEBULA_LIGHT)
                         .strong(),

@@ -953,7 +953,7 @@ impl eframe::App for NebulyaApp {
                             .color(crate::ui::theme::STARLIGHT),
                     );
                     ui.label(
-                        egui::RichText::new("FABRIC · MINECRAFT")
+                        egui::RichText::new("S T E L L A R · F A B R I C")
                             .size(9.0)
                             .color(crate::ui::theme::TEXT_FAINT),
                     );
@@ -982,7 +982,7 @@ impl eframe::App for NebulyaApp {
                                 egui::RichText::new(label)
                                     .size(14.0)
                                     .strong()
-                                    .color(crate::ui::theme::NEBULA_DARK_TEXT)
+                                    .color(egui::Color32::WHITE)
                             } else {
                                 egui::RichText::new(label)
                                     .size(14.0)
@@ -991,7 +991,7 @@ impl eframe::App for NebulyaApp {
                             let mut btn = egui::Button::new(rich)
                                 .selected(selected)
                                 .min_size(egui::vec2(192.0, 40.0))
-                                .corner_radius(egui::CornerRadius::same(8));
+                                .corner_radius(egui::CornerRadius::same(12));
                             if selected {
                                 btn = btn.fill(crate::ui::theme::NEBULA);
                             }
@@ -1025,78 +1025,103 @@ impl eframe::App for NebulyaApp {
                             ui.vertical_centered(|ui| {
                                 crate::ui::theme::badge(
                                     ui,
-                                    &format!("● v{} 정식", env!("CARGO_PKG_VERSION")),
+                                    &format!("★ v{} stellar", env!("CARGO_PKG_VERSION")),
                                     crate::ui::theme::NEBULA_LIGHT,
                                 );
                             });
                             ui.add_space(6.0);
-                            // 유저 카드 (아바타 + 이름 + 상태)
+                            // 유저 카드 (아바타 + 이름 + 상태) — 클릭하면 계정 탭으로
                             ui.vertical_centered(|ui| {
-                                crate::ui::theme::tile_frame().show(ui, |ui| {
-                                    ui.set_min_width(164.0);
-                                    ui.horizontal(|ui| {
-                                        let display_name = self
-                                            .config
-                                            .account
-                                            .as_ref()
-                                            .map(|a| a.username.clone())
-                                            .or_else(|| {
-                                                self.config
-                                                    .nebula_account
-                                                    .as_ref()
-                                                    .map(|a| a.username.clone())
-                                            })
-                                            .unwrap_or_else(|| self.config.username.clone());
-                                        let initial = display_name.chars().next().unwrap_or('★');
-                                        let (avatar, _) = ui.allocate_exact_size(
-                                            egui::vec2(34.0, 34.0),
-                                            egui::Sense::hover(),
-                                        );
-                                        ui.painter().circle_filled(
-                                            avatar.center(),
-                                            16.0,
-                                            crate::ui::theme::NEBULA,
-                                        );
-                                        ui.scope_builder(
-                                            egui::UiBuilder::new().max_rect(avatar),
-                                            |ui| {
-                                                ui.centered_and_justified(|ui| {
-                                                    ui.label(
-                                                        egui::RichText::new(initial.to_string())
+                                let card = crate::ui::theme::tile_frame()
+                                    .show(ui, |ui| {
+                                        ui.set_min_width(164.0);
+                                        ui.horizontal(|ui| {
+                                            let display_name = self
+                                                .config
+                                                .account
+                                                .as_ref()
+                                                .map(|a| a.username.clone())
+                                                .or_else(|| {
+                                                    self.config
+                                                        .nebula_account
+                                                        .as_ref()
+                                                        .map(|a| a.username.clone())
+                                                })
+                                                .unwrap_or_else(|| self.config.username.clone());
+                                            let initial =
+                                                display_name.chars().next().unwrap_or('★');
+                                            let (avatar, _) = ui.allocate_exact_size(
+                                                egui::vec2(34.0, 34.0),
+                                                egui::Sense::hover(),
+                                            );
+                                            ui.painter().circle_filled(
+                                                avatar.center(),
+                                                16.0,
+                                                crate::ui::theme::NEBULA,
+                                            );
+                                            ui.scope_builder(
+                                                egui::UiBuilder::new().max_rect(avatar),
+                                                |ui| {
+                                                    ui.centered_and_justified(|ui| {
+                                                        ui.label(
+                                                            egui::RichText::new(
+                                                                initial.to_string(),
+                                                            )
                                                             .strong()
                                                             .color(egui::Color32::WHITE),
-                                                    );
-                                                });
-                                            },
-                                        );
-                                        ui.vertical(|ui| {
-                                            ui.label(
-                                                egui::RichText::new(&display_name)
-                                                    .size(13.0)
-                                                    .strong(),
+                                                        );
+                                                    });
+                                                },
                                             );
-                                            if self.config.account.is_some() {
+                                            ui.vertical(|ui| {
                                                 ui.label(
-                                                    egui::RichText::new("● 정품 계정")
-                                                        .size(11.0)
-                                                        .color(crate::ui::theme::SUCCESS),
+                                                    egui::RichText::new(&display_name)
+                                                        .size(13.0)
+                                                        .strong(),
                                                 );
-                                            } else if self.config.nebula_account.is_some() {
-                                                ui.label(
-                                                    egui::RichText::new("● Nebulya 계정")
-                                                        .size(11.0)
-                                                        .color(crate::ui::theme::STAR_BLUE),
-                                                );
-                                            } else {
-                                                ui.label(
-                                                    egui::RichText::new("○ 미로그인")
-                                                        .size(11.0)
-                                                        .color(crate::ui::theme::TEXT_DIM),
-                                                );
-                                            }
+                                                if self.config.account.is_some() {
+                                                    ui.label(
+                                                        egui::RichText::new("● 정품 계정")
+                                                            .size(11.0)
+                                                            .color(crate::ui::theme::SUCCESS),
+                                                    );
+                                                } else if self.config.nebula_account.is_some() {
+                                                    ui.label(
+                                                        egui::RichText::new("● Nebulya 계정")
+                                                            .size(11.0)
+                                                            .color(crate::ui::theme::STAR_BLUE),
+                                                    );
+                                                } else {
+                                                    ui.label(
+                                                        egui::RichText::new("○ 미로그인")
+                                                            .size(11.0)
+                                                            .color(crate::ui::theme::TEXT_DIM),
+                                                    );
+                                                }
+                                            });
+                                            ui.with_layout(
+                                                egui::Layout::right_to_left(egui::Align::Center),
+                                                |ui| {
+                                                    ui.label(
+                                                        egui::RichText::new("→")
+                                                            .size(14.0)
+                                                            .color(crate::ui::theme::TEXT_FAINT),
+                                                    );
+                                                },
+                                            );
                                         });
-                                    });
-                                });
+                                    })
+                                    .response;
+                                if ui
+                                    .interact(
+                                        card.rect,
+                                        egui::Id::new("user_card"),
+                                        egui::Sense::click(),
+                                    )
+                                    .clicked()
+                                {
+                                    self.tab = Tab::Account;
+                                }
                             });
                             ui.add_space(4.0);
                         });
@@ -1119,7 +1144,7 @@ impl eframe::App for NebulyaApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(
-                        egui::RichText::new("●  INSTANCE")
+                        egui::RichText::new("◆  INSTANCE")
                             .size(11.0)
                             .color(crate::ui::theme::TEXT_FAINT),
                     );

@@ -1,6 +1,6 @@
 [package]
 name = "nebulya-launcher"
-version = "7.8.0"
+version = "7.9.0"
 edition = "2021"
 description = "Nebulya Launcher - Rust 기반 Fabric Minecraft 런처 (Lunar/Feather/Dawn 스타일)"
 authors = ["Nebulya"]

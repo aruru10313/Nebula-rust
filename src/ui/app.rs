@@ -1019,73 +1019,97 @@ impl eframe::App for NebulyaApp {
                         }
                     });
 
-                ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
-                    ui.add_space(12.0);
-                    ui.vertical_centered(|ui| {
-                        crate::ui::theme::badge(
-                            ui,
-                            &format!("★ v{} stellar", env!("CARGO_PKG_VERSION")),
-                            crate::ui::theme::NEBULA_LIGHT,
-                        );
-                    });
-                    ui.add_space(6.0);
-                    // 유저 카드 (아바타 + 이름 + 상태)
-                    crate::ui::theme::tile_frame().show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            let display_name = self
-                                .config
-                                .account
-                                .as_ref()
-                                .map(|a| a.username.clone())
-                                .or_else(|| {
-                                    self.config
-                                        .nebula_account
-                                        .as_ref()
-                                        .map(|a| a.username.clone())
-                                })
-                                .unwrap_or_else(|| self.config.username.clone());
-                            let initial = display_name.chars().next().unwrap_or('★');
-                            let (avatar, _) = ui
-                                .allocate_exact_size(egui::vec2(34.0, 34.0), egui::Sense::hover());
-                            ui.painter().circle_filled(
-                                avatar.center(),
-                                16.0,
-                                crate::ui::theme::NEBULA,
-                            );
-                            ui.scope_builder(egui::UiBuilder::new().max_rect(avatar), |ui| {
-                                ui.centered_and_justified(|ui| {
-                                    ui.label(
-                                        egui::RichText::new(initial.to_string())
-                                            .strong()
-                                            .color(egui::Color32::WHITE),
-                                    );
+                // 하단 고정 푸터 — 절대 위치 + 단일 수직 스택으로 겹침·나란배치 원천 차단.
+                // (bottom_up에 여러 centered 블록을 두면 나란히 붙는 케이스가 실측됨)
+                let panel_rect = ui.max_rect();
+                let footer_h = 140.0;
+                let footer_rect = egui::Rect::from_min_size(
+                    egui::pos2(panel_rect.min.x, panel_rect.bottom() - footer_h),
+                    egui::vec2(panel_rect.width(), footer_h),
+                );
+                ui.scope_builder(egui::UiBuilder::new().max_rect(footer_rect), |ui| {
+                    ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                        // bottom_up의 자식은 하나로 — 내부는 평범한 top_down 수직 스택
+                        ui.vertical(|ui| {
+                            ui.vertical_centered(|ui| {
+                                crate::ui::theme::badge(
+                                    ui,
+                                    &format!("★ v{} stellar", env!("CARGO_PKG_VERSION")),
+                                    crate::ui::theme::NEBULA_LIGHT,
+                                );
+                            });
+                            ui.add_space(6.0);
+                            // 유저 카드 (아바타 + 이름 + 상태)
+                            ui.vertical_centered(|ui| {
+                                crate::ui::theme::tile_frame().show(ui, |ui| {
+                                    ui.set_min_width(164.0);
+                                    ui.horizontal(|ui| {
+                                        let display_name = self
+                                            .config
+                                            .account
+                                            .as_ref()
+                                            .map(|a| a.username.clone())
+                                            .or_else(|| {
+                                                self.config
+                                                    .nebula_account
+                                                    .as_ref()
+                                                    .map(|a| a.username.clone())
+                                            })
+                                            .unwrap_or_else(|| self.config.username.clone());
+                                        let initial = display_name.chars().next().unwrap_or('★');
+                                        let (avatar, _) = ui.allocate_exact_size(
+                                            egui::vec2(34.0, 34.0),
+                                            egui::Sense::hover(),
+                                        );
+                                        ui.painter().circle_filled(
+                                            avatar.center(),
+                                            16.0,
+                                            crate::ui::theme::NEBULA,
+                                        );
+                                        ui.scope_builder(
+                                            egui::UiBuilder::new().max_rect(avatar),
+                                            |ui| {
+                                                ui.centered_and_justified(|ui| {
+                                                    ui.label(
+                                                        egui::RichText::new(initial.to_string())
+                                                            .strong()
+                                                            .color(egui::Color32::WHITE),
+                                                    );
+                                                });
+                                            },
+                                        );
+                                        ui.vertical(|ui| {
+                                            ui.label(
+                                                egui::RichText::new(&display_name)
+                                                    .size(13.0)
+                                                    .strong(),
+                                            );
+                                            if self.config.account.is_some() {
+                                                ui.label(
+                                                    egui::RichText::new("● 정품 계정")
+                                                        .size(11.0)
+                                                        .color(crate::ui::theme::SUCCESS),
+                                                );
+                                            } else if self.config.nebula_account.is_some() {
+                                                ui.label(
+                                                    egui::RichText::new("● Nebulya 계정")
+                                                        .size(11.0)
+                                                        .color(crate::ui::theme::STAR_BLUE),
+                                                );
+                                            } else {
+                                                ui.label(
+                                                    egui::RichText::new("○ 미로그인")
+                                                        .size(11.0)
+                                                        .color(crate::ui::theme::TEXT_DIM),
+                                                );
+                                            }
+                                        });
+                                    });
                                 });
                             });
-                            ui.vertical(|ui| {
-                                ui.label(egui::RichText::new(&display_name).size(13.0).strong());
-                                if self.config.account.is_some() {
-                                    ui.label(
-                                        egui::RichText::new("● 정품 계정")
-                                            .size(11.0)
-                                            .color(crate::ui::theme::SUCCESS),
-                                    );
-                                } else if self.config.nebula_account.is_some() {
-                                    ui.label(
-                                        egui::RichText::new("● Nebulya 계정")
-                                            .size(11.0)
-                                            .color(crate::ui::theme::STAR_BLUE),
-                                    );
-                                } else {
-                                    ui.label(
-                                        egui::RichText::new("○ 미로그인")
-                                            .size(11.0)
-                                            .color(crate::ui::theme::TEXT_DIM),
-                                    );
-                                }
-                            });
+                            ui.add_space(4.0);
                         });
                     });
-                    ui.add_space(4.0);
                 });
             });
 

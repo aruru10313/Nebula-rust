@@ -92,9 +92,7 @@ impl LauncherConfig {
                 Err(e) => {
                     // 파싱 실패 시 덮어쓰기 전에 백업 (계정 정보 보호)
                     tracing::warn!("config 파싱 실패, 백업 후 기본값 사용: {e}");
-                    let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
-                    let bak = path.with_extension(format!("json.bak-{stamp}"));
-                    let _ = std::fs::rename(&path, &bak);
+                    crate::core::backup_corrupt(&path);
                     Self::default()
                 }
             },
@@ -104,11 +102,8 @@ impl LauncherConfig {
 
     pub fn save(&self) -> Result<()> {
         let path = Self::config_path();
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).context("config dir 생성 실패")?;
-        }
         let json = serde_json::to_string_pretty(self)?;
-        std::fs::write(&path, json).context("config 저장 실패")?;
+        crate::core::write_atomic(&path, json.as_bytes()).context("config 저장 실패")?;
         Ok(())
     }
 

@@ -161,12 +161,22 @@ impl Instance {
 /// 인스턴스 목록 저장/로드 (`instances.json`)
 pub fn load_instances(root: &std::path::Path) -> Vec<Instance> {
     let path = root.join("instances.json");
-    if let Ok(bytes) = std::fs::read(&path) {
-        if let Ok(list) = serde_json::from_slice::<Vec<Instance>>(&bytes) {
-            return list;
-        }
+    match std::fs::read(&path) {
+        Ok(bytes) => match serde_json::from_slice::<Vec<Instance>>(&bytes) {
+            Ok(list) => list,
+            Err(e) => {
+                // 파싱 실패 시 덮어쓰기 전에 백업 (인스턴스 목록 보호)
+                tracing::warn!("instances 파싱 실패, 백업 후 기본값 사용: {e}");
+                crate::core::backup_corrupt(&path);
+                default_instance()
+            }
+        },
+        Err(_) => default_instance(),
     }
-    // 첫 실행 기본 인스턴스 1개
+}
+
+/// 첫 실행 기본 인스턴스 1개
+fn default_instance() -> Vec<Instance> {
     vec![Instance::new_fabric(
         "Nebulya Fabric".to_string(),
         "1.20.1".to_string(),
@@ -175,9 +185,8 @@ pub fn load_instances(root: &std::path::Path) -> Vec<Instance> {
 }
 
 pub fn save_instances(root: &std::path::Path, list: &[Instance]) -> anyhow::Result<()> {
-    std::fs::create_dir_all(root)?;
     let path = root.join("instances.json");
     let json = serde_json::to_string_pretty(list)?;
-    std::fs::write(path, json)?;
+    crate::core::write_atomic(&path, json.as_bytes())?;
     Ok(())
 }

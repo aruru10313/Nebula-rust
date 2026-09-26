@@ -7,7 +7,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         theme::section_header(ui, "★", "인스턴스", "MC 버전 + Fabric 조합");
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if theme::accent_button(ui, "＋ 새 인스턴스").clicked() {
+            if theme::small_accent_button(ui, "＋ 새 인스턴스").clicked() {
                 app.show_new_instance = true;
             }
         });

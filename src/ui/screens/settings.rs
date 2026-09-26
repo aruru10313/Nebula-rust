@@ -3,7 +3,7 @@ use crate::ui::NebulyaApp;
 
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
-    theme::section_header(ui, "⚙", "설정", "런처를 내 별자리처럼");
+    theme::section_header(ui, "●", "설정", "일반 설정");
     ui.add_space(8.0);
 
     // 계정 관리는 계정 탭에서 (인스턴스별 버전·로더 설정과 분리)
@@ -38,7 +38,7 @@ use crate::ui::theme::form_row;
 // ---- 1. 게임 ----
 fn game_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
-        theme::section_header(ui, "☕", "게임", "Java · 메모리 · 화면");
+        theme::section_header(ui, "●", "게임", "Java · 메모리 · 화면");
         form_row(ui, "Java 경로", |ui| {
             ui.text_edit_singleline(&mut app.config.java_path);
             if ui.small_button("찾기").clicked() {

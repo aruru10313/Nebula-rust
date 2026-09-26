@@ -25,15 +25,6 @@ impl Tab {
             Tab::Settings => "설정",
         }
     }
-    fn icon(self) -> &'static str {
-        match self {
-            Tab::Home => "▶",
-            Tab::Instances => "▦",
-            Tab::Mods => "◆",
-            Tab::Account => "👤",
-            Tab::Settings => "⚙",
-        }
-    }
 }
 
 pub struct NebulyaApp {
@@ -109,7 +100,7 @@ impl NebulyaApp {
             progress: None,
             launching: false,
             logs: vec![format!(
-                "★ Nebulya Launcher v{} stellar 초기화",
+                "Nebulya Launcher v{} 시작",
                 env!("CARGO_PKG_VERSION")
             )],
             new_instance_name: "새 인스턴스".to_string(),
@@ -286,7 +277,7 @@ impl NebulyaApp {
                 self.config.account = Some(acc.clone());
                 self.config.onboarding_done = true;
                 self.persist();
-                self.status = format!("★ {}님, 정품 로그인 완료", acc.username);
+                self.status = format!("정품 로그인 완료 — {}님", acc.username);
                 self.log(format!("정품 로그인: {} ({})", acc.username, acc.uuid));
                 *self.login_state.lock().unwrap_or_else(|e| e.into_inner()) = LoginState::Idle;
             }
@@ -962,7 +953,7 @@ impl eframe::App for NebulyaApp {
                             .color(crate::ui::theme::STARLIGHT),
                     );
                     ui.label(
-                        egui::RichText::new("S T E L L A R · F A B R I C")
+                        egui::RichText::new("FABRIC · MINECRAFT")
                             .size(9.0)
                             .color(crate::ui::theme::TEXT_FAINT),
                     );
@@ -986,12 +977,12 @@ impl eframe::App for NebulyaApp {
                             Tab::Settings,
                         ] {
                             let selected = self.tab == tab;
-                            let label = format!("{}  {}", tab.icon(), tab.label());
+                            let label = tab.label().to_string();
                             let rich = if selected {
                                 egui::RichText::new(label)
                                     .size(14.0)
                                     .strong()
-                                    .color(egui::Color32::WHITE)
+                                    .color(crate::ui::theme::NEBULA_DARK_TEXT)
                             } else {
                                 egui::RichText::new(label)
                                     .size(14.0)
@@ -1000,7 +991,7 @@ impl eframe::App for NebulyaApp {
                             let mut btn = egui::Button::new(rich)
                                 .selected(selected)
                                 .min_size(egui::vec2(192.0, 40.0))
-                                .corner_radius(egui::CornerRadius::same(12));
+                                .corner_radius(egui::CornerRadius::same(8));
                             if selected {
                                 btn = btn.fill(crate::ui::theme::NEBULA);
                             }
@@ -1034,7 +1025,7 @@ impl eframe::App for NebulyaApp {
                             ui.vertical_centered(|ui| {
                                 crate::ui::theme::badge(
                                     ui,
-                                    &format!("★ v{} stellar", env!("CARGO_PKG_VERSION")),
+                                    &format!("● v{} 정식", env!("CARGO_PKG_VERSION")),
                                     crate::ui::theme::NEBULA_LIGHT,
                                 );
                             });
@@ -1128,7 +1119,7 @@ impl eframe::App for NebulyaApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(
-                        egui::RichText::new("◆  INSTANCE")
+                        egui::RichText::new("●  INSTANCE")
                             .size(11.0)
                             .color(crate::ui::theme::TEXT_FAINT),
                     );

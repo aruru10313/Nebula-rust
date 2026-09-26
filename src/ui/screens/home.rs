@@ -66,7 +66,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             ui.vertical_centered(|ui| {
                 ui.add_space(6.0);
                 ui.label(
-                    egui::RichText::new("★ S T E L L A R · F A B R I C")
+                    egui::RichText::new("MINECRAFT · FABRIC LAUNCHER")
                         .size(12.0)
                         .color(theme::NEBULA_LIGHT)
                         .strong(),
@@ -89,7 +89,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                         theme::badge(ui, &inst.display_version(), theme::NEBULA_LIGHT);
                         ui.label(
                             egui::RichText::new(format!(
-                                "★ {}회 항해{}",
+                                "▶ {}회 플레이{}",
                                 inst.total_plays,
                                 inst.last_played
                                     .map(|t| format!(" · 마지막: {}", t.format("%m/%d %H:%M")))
@@ -106,9 +106,9 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 if theme::accent_button(
                     ui,
                     if app.launching {
-                        "★  워프 중..."
+                        "실행 중..."
                     } else {
-                        "▶  지금 항해"
+                        "▶  플레이"
                     },
                 )
                 .clicked()
@@ -148,7 +148,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                             .color(theme::TEXT_DIM),
                     );
                     ui.label(
-                        egui::RichText::new(format!("★ {}회 항해", inst.total_plays))
+                        egui::RichText::new(format!("▶ {}회 플레이", inst.total_plays))
                             .size(11.0)
                             .color(theme::NEBULA_LIGHT),
                     );
@@ -207,11 +207,11 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         (plays, mods_count, short)
     };
     ui.horizontal_wrapped(|ui| {
-        theme::stat_tile(ui, "🚀", &plays, "항해 횟수", theme::NEBULA_LIGHT);
+        theme::stat_tile(ui, "▶", &plays, "플레이 횟수", theme::NEBULA_LIGHT);
         theme::stat_tile(ui, "◆", &mods_count, "탑재 모드", theme::STAR_PINK);
         theme::stat_tile(
             ui,
-            "☕",
+            "●",
             if java_short.is_empty() {
                 "-"
             } else {
@@ -222,7 +222,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         );
         theme::stat_tile(
             ui,
-            "💾",
+            "●",
             &format!("{}M", app.config.ram_mb),
             "할당 RAM",
             theme::SUCCESS,
@@ -231,10 +231,10 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
 
     ui.add_space(12.0);
 
-    // ---- 항해일지 (로그) ----
+    // ---- 실행 로그 ----
     theme::glow_card_frame().show(ui, |ui| {
         ui.horizontal(|ui| {
-            theme::section_header(ui, "≡", "항해일지", "최근 로그");
+            theme::section_header(ui, "≡", "로그", "최근 실행 기록");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if theme::ghost_button(ui, "지우기").clicked() {
                     app.logs.clear();

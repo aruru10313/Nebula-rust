@@ -6,7 +6,7 @@ use crate::ui::NebulyaApp;
 /// 인스턴스별 게임 버전·Fabric 로더는 인스턴스 탭에서 따로 관리된다.
 pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
-    theme::section_header(ui, "👤", "계정", "Nebulya 로그인");
+    theme::section_header(ui, "●", "계정", "Nebulya 로그인");
     ui.add_space(8.0);
 
     // MS 로그인은 심사 승인 후 복구 예정이라 당분간 Nebulya 계정만 노출.

@@ -46,7 +46,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     });
                     ui.label(
                         egui::RichText::new(format!(
-                            "🚀 {}회 항해{}",
+                            "▶ {}회 플레이{}",
                             inst.total_plays,
                             inst.last_played
                                 .map(|t| format!(" · {}", t.format("%Y-%m-%d %H:%M")))

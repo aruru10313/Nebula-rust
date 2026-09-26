@@ -427,11 +427,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         let searching = app.mods_ui.searching;
         ui.add_enabled_ui(!searching, |ui| {
             if ui
-                .button(if searching {
-                    "검색 중..."
-                } else {
-                    "🔍 검색"
-                })
+                .button(if searching { "검색 중..." } else { "검색" })
                 .clicked()
             {
                 app.search_mods_now();
@@ -460,7 +456,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     // 검색 결과
     crate::ui::theme::card_frame().show(ui, |ui| {
         ui.horizontal(|ui| {
-            theme::section_header(ui, "🔭", "검색 결과", provider_label(app.mods_ui.provider));
+            theme::section_header(ui, "●", "검색 결과", provider_label(app.mods_ui.provider));
         });
         ui.add_space(2.0);
         match app.mods_ui.provider {
@@ -577,7 +573,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             theme::section_header(ui, "★", "설치된 모드", "클릭으로 켜기/끄기");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if theme::ghost_button(ui, "📂 폴더 열기").clicked() {
+                if theme::ghost_button(ui, "폴더 열기").clicked() {
                     if let Some(inst) = app.selected_instance() {
                         let dir = inst.mods_dir(&app.config.game_root);
                         let _ = open::that(&dir);
@@ -609,7 +605,15 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 });
                 theme::tile_frame().show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new(if enabled { "✅" } else { "⏸" }).size(16.0));
+                        ui.label(
+                            egui::RichText::new(if enabled { "●" } else { "○" })
+                                .size(16.0)
+                                .color(if enabled {
+                                    crate::ui::theme::SUCCESS
+                                } else {
+                                    crate::ui::theme::TEXT_DIM
+                                }),
+                        );
                         ui.vertical(|ui| {
                             ui.monospace(&file_name);
                             if let Some(m) = meta {

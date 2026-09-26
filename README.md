@@ -1,15 +1,18 @@
-# Nebulya Launcher — Rust 기반 Fabric 런처 (v0.3)
+# Nebulya Launcher — Rust 기반 Fabric 런처
 
-Lunar Client / 구 Feather Client / Dawn Launcher 스타일을 목표로 한
 Rust 네이티브 마인크래프트 **Fabric 전용** 런처입니다.
+별(스텔라) 컨셉의 다크 UI + 단일 바이너리 GUI (`eframe` + `egui`, WebView 불필요).
 
-- 단일 바이너리 GUI (`eframe` + `egui`, WebView 불필요 → GitHub Actions 빌드 간단)
-- Mojang 버전 매니페스트 + Fabric Meta API 연동
-- **Microsoft 정품 로그인** (Device Code → Xbox → MC Services, refresh 자동 갱신)
+- Microsoft 정품 로그인 (Device Code → Xbox → MC Services, 심사 승인 후 활성화)
+- Nebulya 자체 계정 (이메일 인증 + 서버 세션)
+- Mojang 버전 매니페스트 + Fabric Meta API 연동 (메타 캐시로 오프라인 실행 지원)
 - **Modrinth + CurseForge (Fabric 강제 필터)** 검색·설치·활성화/삭제
-- **Discord Activity** (대기/검색/플레이/설정 + 경과 시간 + GitHub 버튼)
-- Java 자동탐지 + RAM/해상도 설정 + 인스턴스(프로필) 관리
+- **Discord Activity** (상태 반영)
+- Java 자동탐지 + Adoptium JRE 21 자동 설치 + RAM/해상도 설정
+- 인스턴스 관리 (생성/복제/이름 변경/삭제 확인/폴더 열기)
+- 게임 로그 캡처·회전 보관 + 런처 로그 파일
 - 한글 번들 폰트 (NotoSansKR 서브셋, tofu 방지 + 커버리지 테스트)
+- 인앱 자동 업데이트 (GitHub Releases 확인 → Setup 실행)
 - Win/Linux/macOS 설치 파일 자동 생성 (Setup exe / .deb+tar.gz / .dmg+tar.gz)
 
 저장소: https://github.com/aruru10313/Nebula-rust
@@ -20,14 +23,13 @@ Rust 네이티브 마인크래프트 **Fabric 전용** 런처입니다.
 cargo run --release
 ```
 
-필요 조건: Rust stable, Java 17+ (마인크 1.20+ 기준)
+필요 조건: Rust stable (rust-toolchain.toml 고정), Java 17+ (없으면 설정에서 자동 설치)
 
-## 정품 로그인
+## 로그인
 
-1. `★ Microsoft 로그인` → 브라우저에서 코드 입력 → 완료
-2. 이후 실행 시 토큰 자동 갱신, 실패하면 에러 후 중단 (오프라인 폴백 없음)
-3. 공용 Client ID가 빌드에 내장되어 있어 별도 Azure 작업이 필요 없습니다.
-   다른 ID를 쓰려면 설정 → 고급에서 변경하거나 환경변수 `NEBULYA_MS_CLIENT_ID`를 사용하세요.
+- 계정 탭에서 Nebulya 로그인/가입 (이메일 인증 코드 방식)
+- Microsoft 정품 로그인은 API 심사 승인 후 복구 예정
+- 로그인 없이 게스트 실행도 가능 (정품 서버 접속 불가)
 
 ## 모드 (Fabric 전용)
 
@@ -36,44 +38,40 @@ cargo run --release
 - 설치된 모드는 `~/.nebulya-launcher/instances/<id>/mods/*.jar` 가 실제 기준
   - `끄기` = `.jar.disabled` 로 변경 (Prism/Dawn과 동일 규칙)
 - CurseForge는 API 키 필요: https://console.curseforge.com/ 발급 후
-  설정 탭 입력 또는 환경변수 `NEBULYA_CF_API_KEY`
-
-## Discord Activity
-
-1. https://discord.com/developers/applications 에서 앱 생성
-2. Client ID를 설정 탭 → Discord Activity에 입력 → 저장
-3. 디스코드가 켜져 있으면 홈/검색/플레이/설정 + 경과 시간이 표시됨
-4. 사이드바 유저 카드에서 🟢활동 표시 중 / 🟡연결 대기 중 / ⚪꺼짐 확인 가능
-5. 디스코드가 꺼져 있으면 자동으로 비활성화 (런처 정상 동작)
+  연동 카드 입력 또는 환경변수 `NEBULYA_CF_API_KEY`
 
 ## 구조
 
 ```
 src/
-  main.rs              # eframe 진입점
+  main.rs              # eframe 진입점 (릴리스에서 콘솔 숨김)
   core/
-    config.rs          # ~/.nebulya-launcher/config.json (+CF키/Discord 설정)
+    config.rs          # ~/.nebulya-launcher/config.json
     instance.rs        # 인스턴스 + InstalledMod(Modrinth/CurseForge 메타)
   minecraft/
     version.rs         # piston-meta 버전 매니페스트
     fabric.rs          # meta.fabricmc.net
-    auth.rs            # 오프라인 세션 + MS Device Flow 뼈대
-    java.rs            # Java 탐색
-    launcher.rs        # 다운로드 → classpath → java spawn
+    auth.rs            # MS Device Flow + 세션 관리
+    nebula_auth.rs     # Nebulya 자체 계정 API 클라이언트
+    java.rs            # Java 탐색 + Adoptium JRE 자동 설치
+    launcher.rs        # 다운로드(검증+원자 교체) → classpath → java spawn
     modrinth.rs        # Modrinth 검색/버전/설치 (Fabric 강제)
     curseforge.rs      # CurseForge 검색/파일/설치 (modLoaderType=Fabric)
-    mods.rs            # 공용 다운로드 + 토글/삭제
+    mods.rs            # 공용 다운로드 + 토글/삭제 + 파일명 검증
+    update.rs          # 인앱 자동 업데이트 확인/적용
     discord.rs         # Discord Rich Presence
   ui/
-    theme.rs           # Lunar/Dawn식 다크 테마
-    app.rs             # 사이드바 + 상단바 + 상태바 + Discord 상태 반영
+    theme.rs           # 다크 테마 + 공용 위젯
+    app.rs             # 사이드바 + 커스텀 타이틀바 + 상단바 + 상태바
     screens/
-      home.rs instances.rs mods.rs settings.rs
+      home.rs instances.rs mods.rs account.rs settings.rs
 installer/windows/nebulya-setup.iss  # Inno Setup (Windows 설치 exe)
 scripts/
   package-linux.sh     # tar.gz + .deb
   package-macos.sh     # .app tar.gz + .dmg
-.github/workflows/build.yml  # 3OS 빌드 + 패키징 + Release
+.github/workflows/
+  ci.yml               # PR/push 검증 (가벼운 check 중심)
+  release.yml          # 태그 릴리스 (3OS 빌드 + draft 검증 후 공개)
 ```
 
 ## 설치 파일 만들기
@@ -81,30 +79,30 @@ scripts/
 ```bash
 # Linux (tar.gz + .deb)
 cargo build --release --target x86_64-unknown-linux-gnu
-bash scripts/package-linux.sh x86_64-unknown-linux-gnu
+bash scripts/package-linux.sh x86_64-unknown-linux-gnu <버전>
 
 # macOS (tar.gz + .dmg, dmg는 macOS에서만)
 cargo build --release --target aarch64-apple-darwin
-bash scripts/package-macos.sh aarch64-apple-darwin
+bash scripts/package-macos.sh aarch64-apple-darwin <버전>
 
 # Windows (Inno Setup 필요)
-# iscc installer/windows/nebulya-setup.iss /DBinaryDir=target\x86_64-pc-windows-msvc\release
+# iscc installer/windows/nebulya-setup.iss /DMyAppVersion=<버전> /DBinaryDir=target\x86_64-pc-windows-msvc\release
 ```
 
-GitHub Actions가 `main` 푸시 / `v*` 태그마다 3OS 빌드+패키징을 자동 수행합니다.
-일반 푸시는 컴파일+패키징 검증만 하고, 설치 파일은 태그 푸시 시 생성되는
-Release에 **직접 첨부**됩니다 (Actions 아티팩트를 거치지 않아 할당량 소모 없음).
+릴리스: `Cargo.toml` 버전과 일치하는 태그를 푸시하면 GitHub Actions가
+3OS 빌드+패키징 후 draft 릴리스를 검증하고 공개합니다.
 
 ```bash
-git tag v0.3.0 && git push origin v0.3.0
+git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
 ## 로드맵
 
-- [x] 기초 틀 + Vanilla/Fabric 실행 (오프라인)
-- [x] Microsoft 정품 로그인 + 자동 갱신
+- [x] Vanilla/Fabric 실행 (온라인 + 오프라인 캐시)
+- [x] Nebulya 자체 계정 + 자동 갱신되는 MS 세션 구조
 - [x] Modrinth / CurseForge Fabric 모드 관리
-- [x] Discord Activity (타임스탬프/버튼/연결 표시)
-- [x] 3OS 설치 파일 틀
-- [ ] 실시간 게임 로그 스트리밍 + 크래시 리포트
-- [ ] 디자인 고도화 (커스텀 타이틀바, 애니메이션, 테마)
+- [x] Discord Activity
+- [x] 3OS 설치 파일 + 인앱 자동 업데이트
+- [x] 커스텀 타이틀바, 게임 로그 캡처
+- [ ] MS 정품 로그인 복구 (API 심사 승인 후)
+- [ ] 크래시 리포트 고도화

@@ -77,6 +77,8 @@ pub struct NebulyaApp {
     pub java_version_cache: String,
     minimize_after_launch: bool,
     pub confirm_delete_instance: Option<String>,
+    pub rename_instance_id: Option<String>,
+    pub rename_name: String,
     pub http: reqwest::Client,
     progress_state: Arc<Mutex<Option<LaunchProgress>>>,
 }
@@ -137,6 +139,8 @@ impl NebulyaApp {
             java_version_cache: String::new(),
             minimize_after_launch: false,
             confirm_delete_instance: None,
+            rename_instance_id: None,
+            rename_name: String::new(),
             http,
             progress_state: Arc::new(Mutex::new(None)),
         };

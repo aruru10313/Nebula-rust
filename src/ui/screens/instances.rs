@@ -66,6 +66,10 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     if ui.small_button("복제").clicked() {
                         app.duplicate_instance(&inst.id);
                     }
+                    if ui.small_button("이름").clicked() {
+                        app.rename_instance_id = Some(inst.id.clone());
+                        app.rename_name = inst.name.clone();
+                    }
                     if ui.small_button("▶ 실행").clicked() {
                         app.config.selected_instance = Some(inst.id.clone());
                         app.launch();
@@ -111,6 +115,37 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                     }
                     if theme::ghost_button(ui, "취소").clicked() {
                         app.confirm_delete_instance = None;
+                    }
+                });
+            });
+    }
+
+    if app.rename_instance_id.is_some() {
+        egui::Window::new("인스턴스 이름 변경")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ui.ctx(), |ui| {
+                ui.set_min_width(320.0);
+                ui.label("새 이름");
+                ui.text_edit_singleline(&mut app.rename_name);
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if theme::accent_button(ui, "저장").clicked() {
+                        let name = app.rename_name.trim().to_string();
+                        if let Some(id) = app.rename_instance_id.clone() {
+                            if !name.is_empty() {
+                                if let Some(inst) = app.instances.iter_mut().find(|i| i.id == id) {
+                                    inst.name = name;
+                                    app.persist();
+                                    app.status = "인스턴스 이름 변경됨".to_string();
+                                }
+                            }
+                        }
+                        app.rename_instance_id = None;
+                    }
+                    if theme::ghost_button(ui, "취소").clicked() {
+                        app.rename_instance_id = None;
                     }
                 });
             });

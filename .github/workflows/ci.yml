@@ -57,11 +57,13 @@ jobs:
       - name: Run tests
         run: cargo test --locked
 
-  build:
-    name: Build + Package (${{ matrix.os }}/${{ matrix.target }})
+  # 일반 푸시에서는 가볍게 check만 수행 (예산 절약).
+  # 무거운 릴리스 빌드·패키징은 태그 릴리스(release.yml)에서만 실행.
+  check:
+    name: Check (${{ matrix.os }}/${{ matrix.target }})
     needs: verify
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 30
     permissions:
       contents: read
     strategy:
@@ -70,33 +72,14 @@ jobs:
         include:
           - os: windows-2022
             target: x86_64-pc-windows-msvc
-            ext: .exe
-            kind: windows
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            ext: ""
-            kind: linux
-          - os: macos-14
-            target: aarch64-apple-darwin
-            ext: ""
-            kind: macos
 
     steps:
       - name: Check out repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-
-      - name: Read package version
-        id: package-version
-        shell: bash
-        run: |
-          version="$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)"
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Cargo.toml 버전 형식이 올바르지 않습니다: $version" >&2
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
@@ -115,62 +98,5 @@ jobs:
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684 # v2.8.0
 
-      - name: Build release binary
-        run: cargo build --release --locked --target ${{ matrix.target }}
-
-      - name: Install pinned cargo-deb
-        if: runner.os == 'Linux'
-        run: cargo install cargo-deb --version 3.8.0 --locked
-
-      - name: Package Linux
-        if: runner.os == 'Linux'
-        shell: bash
-        run: bash scripts/package-linux.sh ${{ matrix.target }} ${{ steps.package-version.outputs.version }}
-
-      - name: Package macOS
-        if: runner.os == 'macOS'
-        shell: bash
-        run: bash scripts/package-macos.sh ${{ matrix.target }} ${{ steps.package-version.outputs.version }}
-
-      - name: Install pinned Inno Setup compiler
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          INNO_URL: https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe
-          INNO_SHA256: 9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
-          Invoke-WebRequest -Uri $env:INNO_URL -OutFile $installer
-          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInvariant()
-          if ($actual -ne $env:INNO_SHA256.ToLowerInvariant()) {
-            throw "Inno Setup 체크섬 불일치: $actual"
-          }
-          gh release verify-asset is-6_7_3 "$installer" --repo jrsoftware/issrc
-          & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
-          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-          if (-not (Test-Path -LiteralPath $iscc)) {
-            throw "ISCC를 찾을 수 없습니다: $iscc"
-          }
-
-      - name: Package Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = '${{ steps.package-version.outputs.version }}'
-          $binary = "target\${{ matrix.target }}\release\nebulya-launcher${{ matrix.ext }}"
-          if (-not (Test-Path -LiteralPath $binary)) {
-            throw "릴리즈 바이너리를 찾을 수 없습니다: $binary"
-          }
-          New-Item -ItemType Directory -Force -Path dist\windows | Out-Null
-          Copy-Item -LiteralPath $binary -Destination "dist\windows\nebulya-launcher-$version-windows-x86_64${{ matrix.ext }}"
-          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-          & $iscc installer\windows\nebulya-setup.iss "/DMyAppVersion=$version" "/DBinaryDir=${{ github.workspace }}\target\${{ matrix.target }}\release"
-          $setup = "dist\Nebulya-Launcher-Setup-$version.exe"
-          if (-not (Test-Path -LiteralPath $setup)) {
-            throw "Windows 설치 파일을 찾을 수 없습니다: $setup"
-          }
-          Move-Item -LiteralPath $setup -Destination "dist\windows\Nebulya-Launcher-Setup-$version-windows-x86_64.exe"
-          Get-ChildItem -File dist\windows | Format-Table Name, Length
+      - name: Check locked build graph
+        run: cargo check --locked --all-targets --target ${{ matrix.target }}

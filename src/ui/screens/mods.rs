@@ -1,4 +1,4 @@
-//! 모드 화면: Modrinth / CurseForge 검색 + 설치 + 관리 (Fabric 전용)
+﻿//! 모드 화면: Modrinth / CurseForge 검색 + 설치 + 관리 (Fabric 전용)
 //!
 //! - 검색 결과는 선택된 인스턴스의 MC 버전과 Fabric 로더 기준으로 필터됨
 //! - 설치된 모드는 `instances/<id>/mods/*.jar` 가 실제 기준,
@@ -328,7 +328,7 @@ impl NebulyaApp {
                 log,
             } => {
                 self.upsert_installed_mod(&instance_id, installed);
-                self.invalidate_mod_count();
+                self.invalidate_mod_files();
                 self.mods_ui.message = message;
                 self.log(log);
                 self.persist();
@@ -358,7 +358,7 @@ impl NebulyaApp {
                     }
                 }
                 self.mods_ui.message = format!("변경됨: {new_name}");
-                self.invalidate_mod_count();
+                self.invalidate_mod_files();
                 self.persist();
             }
             Err(e) => self.mods_ui.message = format!("토글 실패: {e:#}"),
@@ -380,7 +380,7 @@ impl NebulyaApp {
         }
         self.mods_ui.message = format!("삭제됨: {file_name}");
         self.log(format!("모드 삭제: {file_name}"));
-        self.invalidate_mod_count();
+        self.invalidate_mod_files();
         self.persist();
     }
 }
@@ -581,10 +581,13 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             });
         });
         ui.add_space(2.0);
-        let files = app
-            .selected_instance()
-            .map(|i| i.scan_mod_files(&app.config.game_root))
-            .unwrap_or_default();
+        let files = match app.selected_instance().cloned() {
+            Some(inst) => {
+                let root = app.config.game_root.clone();
+                app.mod_files_cached(&inst.id, &root)
+            }
+            None => vec![],
+        };
         if files.is_empty() {
             ui.label("설치된 모드가 없습니다. 위에서 검색 후 설치하세요.");
         } else {

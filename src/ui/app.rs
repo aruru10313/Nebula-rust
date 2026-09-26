@@ -75,8 +75,8 @@ pub struct NebulyaApp {
     pub nebula_mode_signup: bool,
     /// Java 버전 캐시 (매 프레임 프로세스 실행 방지)
     pub java_version_cache: String,
-    mod_count_cache: (String, usize),
-    mod_count_at: Option<std::time::Instant>,
+    mod_files_cache: (String, Vec<(String, bool)>),
+    mod_files_at: Option<std::time::Instant>,
     minimize_after_launch: bool,
     pub confirm_delete_instance: Option<String>,
     pub rename_instance_id: Option<String>,
@@ -139,8 +139,8 @@ impl NebulyaApp {
             nebula_pending_verify: false,
             nebula_mode_signup: false,
             java_version_cache: String::new(),
-            mod_count_cache: (String::new(), 0),
-            mod_count_at: None,
+            mod_files_cache: (String::new(), vec![]),
+            mod_files_at: None,
             minimize_after_launch: false,
             confirm_delete_instance: None,
             rename_instance_id: None,
@@ -600,34 +600,34 @@ impl NebulyaApp {
         self.java_version_cache = crate::minecraft::java::java_version(&java).unwrap_or_default();
     }
 
-    /// 선택 인스턴스의 모드 개수 (최대 5초 캐시 — 매 프레임 디스크 스캔 방지)
-    pub(crate) fn mod_count_cached(
+    /// 선택 인스턴스의 모드 파일 목록 (최대 5초 캐시 — 매 프레임 디스크 스캔 방지)
+    pub(crate) fn mod_files_cached(
         &mut self,
         instance_id: &str,
         game_root: &std::path::Path,
-    ) -> usize {
+    ) -> Vec<(String, bool)> {
         let now = std::time::Instant::now();
         let fresh = self
-            .mod_count_at
+            .mod_files_at
             .map(|t| now.duration_since(t).as_secs() < 5)
             .unwrap_or(false);
-        if fresh && self.mod_count_cache.0 == instance_id {
-            return self.mod_count_cache.1;
+        if fresh && self.mod_files_cache.0 == instance_id {
+            return self.mod_files_cache.1.clone();
         }
-        let n = self
+        let files = self
             .instances
             .iter()
             .find(|i| i.id == instance_id)
-            .map(|i| i.scan_mod_files(game_root).len())
-            .unwrap_or(0);
-        self.mod_count_cache = (instance_id.to_string(), n);
-        self.mod_count_at = Some(now);
-        n
+            .map(|i| i.scan_mod_files(game_root))
+            .unwrap_or_default();
+        self.mod_files_cache = (instance_id.to_string(), files.clone());
+        self.mod_files_at = Some(now);
+        files
     }
 
-    /// 모드 개수 캐시 무효화 (설치/토글/삭제 직후 호출)
-    pub(crate) fn invalidate_mod_count(&mut self) {
-        self.mod_count_at = None;
+    /// 모드 파일 목록 캐시 무효화 (설치/토글/삭제 직후 호출)
+    pub(crate) fn invalidate_mod_files(&mut self) {
+        self.mod_files_at = None;
     }
 
     /// Mojang 버전 목록 비동기 갱신 (시작 프리징 방지용 백그라운드)

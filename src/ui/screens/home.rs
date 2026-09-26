@@ -194,7 +194,7 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         let mods_count = match app.selected_instance().cloned() {
             Some(inst) => {
                 let root = app.config.game_root.clone();
-                app.mod_count_cached(&inst.id, &root).to_string()
+                app.mod_files_cached(&inst.id, &root).len().to_string()
             }
             None => "-".into(),
         };

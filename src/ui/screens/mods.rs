@@ -328,6 +328,7 @@ impl NebulyaApp {
                 log,
             } => {
                 self.upsert_installed_mod(&instance_id, installed);
+                self.invalidate_mod_count();
                 self.mods_ui.message = message;
                 self.log(log);
                 self.persist();
@@ -357,6 +358,7 @@ impl NebulyaApp {
                     }
                 }
                 self.mods_ui.message = format!("변경됨: {new_name}");
+                self.invalidate_mod_count();
                 self.persist();
             }
             Err(e) => self.mods_ui.message = format!("토글 실패: {e:#}"),
@@ -378,6 +380,7 @@ impl NebulyaApp {
         }
         self.mods_ui.message = format!("삭제됨: {file_name}");
         self.log(format!("모드 삭제: {file_name}"));
+        self.invalidate_mod_count();
         self.persist();
     }
 }

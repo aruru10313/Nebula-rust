@@ -191,10 +191,13 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             .selected_instance()
             .map(|i| i.total_plays.to_string())
             .unwrap_or_else(|| "-".into());
-        let mods_count = app
-            .selected_instance()
-            .map(|i| i.scan_mod_files(&app.config.game_root).len().to_string())
-            .unwrap_or_else(|| "-".into());
+        let mods_count = match app.selected_instance().cloned() {
+            Some(inst) => {
+                let root = app.config.game_root.clone();
+                app.mod_count_cached(&inst.id, &root).to_string()
+            }
+            None => "-".into(),
+        };
         let short = app
             .java_version_cache
             .split('.')

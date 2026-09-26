@@ -678,6 +678,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
+name = "daedalus"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "314dac850cbf02b728fb531c1f3b1bec5b4ccdef6564db274470363792a6d302"
+dependencies = [
+ "bytes",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "derive_arbitrary"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2021,11 +2034,12 @@ dependencies = [
 
 [[package]]
 name = "nebulya-launcher"
-version = "7.9.0"
+version = "7.9.1"
 dependencies = [
  "ab_glyph",
  "anyhow",
  "chrono",
+ "daedalus",
  "dirs",
  "discord-rich-presence",
  "eframe",

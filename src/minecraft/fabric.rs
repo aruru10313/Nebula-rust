@@ -50,15 +50,7 @@ pub async fn fetch_loaders_for_game(
     mc_version: &str,
 ) -> Result<Vec<FabricLoaderForGame>> {
     let url = format!("https://meta.fabricmc.net/v2/versions/loader/{mc_version}");
-    let res = client
-        .get(&url)
-        .send()
-        .await
-        .with_context(|| format!("Fabric loader 조회 실패: {mc_version}"))?
-        .error_for_status()?
-        .json::<Vec<FabricLoaderForGame>>()
-        .await?;
-    Ok(res)
+    crate::minecraft::net::get_json(&client, &url, "Fabric loader 목록").await
 }
 
 /// 최신 stable 로더 버전 문자열만
@@ -77,12 +69,10 @@ pub async fn fetch_latest_stable_loader(
 
 /// Fabric이 지원하는 마크 버전 목록
 pub async fn fetch_game_versions(client: &reqwest::Client) -> Result<Vec<GameVersion>> {
-    let res = client
-        .get("https://meta.fabricmc.net/v2/versions/game")
-        .send()
-        .await?
-        .error_for_status()?
-        .json::<Vec<GameVersion>>()
-        .await?;
-    Ok(res)
+    crate::minecraft::net::get_json(
+        client,
+        "https://meta.fabricmc.net/v2/versions/game",
+        "Fabric 지원 버전 목록",
+    )
+    .await
 }

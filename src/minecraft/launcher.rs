@@ -3,7 +3,7 @@
 
 use crate::core::{Instance, LauncherConfig, LoaderType};
 use crate::minecraft::auth::MinecraftSession;
-use crate::minecraft::version::{Library, VersionJson};
+use crate::minecraft::version::{DownloadType, Library, Os, RuleAction, VersionInfo};
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
@@ -44,8 +44,9 @@ pub async fn prepare_and_launch(
         }
         Err(e) => {
             tracing::warn!("매니페스트 조회 실패, 캐시 사용: {e:#}");
-            load_cache(&manifest_path)
-                .context("첫 실행은 온라인 필요 — 인터넷 연결 후 다시 실행")?
+            load_cache(&manifest_path).with_context(|| {
+                format!("버전 목록 조회 실패 ({e:#}) — 인터넷 연결 후 다시 실행")
+            })?
         }
     };
     let entry = manifest
@@ -57,18 +58,19 @@ pub async fn prepare_and_launch(
         .join("versions")
         .join(&instance.minecraft_version)
         .join(format!("{}.json", instance.minecraft_version));
-    let mut version_json = match crate::minecraft::version::fetch_version_json(&client, &entry.url)
-        .await
-    {
-        Ok(v) => {
-            let _ = save_cache(&version_path, &v);
-            v
-        }
-        Err(e) => {
-            tracing::warn!("버전 JSON 조회 실패, 캐시 사용: {e:#}");
-            load_cache(&version_path).context("첫 실행은 온라인 필요 — 인터넷 연결 후 다시 실행")?
-        }
-    };
+    let mut version_json =
+        match crate::minecraft::version::fetch_version_json(&client, &entry.url).await {
+            Ok(v) => {
+                let _ = save_cache(&version_path, &v);
+                v
+            }
+            Err(e) => {
+                tracing::warn!("버전 JSON 조회 실패, 캐시 사용: {e:#}");
+                load_cache(&version_path).with_context(|| {
+                    format!("버전 정보 조회 실패 ({e:#}) — 인터넷 연결 후 다시 실행")
+                })?
+            }
+        };
 
     let game_dir = instance.game_dir(root);
     std::fs::create_dir_all(&game_dir)?;
@@ -108,8 +110,9 @@ pub async fn prepare_and_launch(
             }
             Err(e) => {
                 tracing::warn!("Fabric 메타 조회 실패, 캐시 사용: {e:#}");
-                load_cache(&meta_path)
-                    .context("첫 실행은 온라인 필요 — 인터넷 연결 후 다시 실행")?
+                load_cache(&meta_path).with_context(|| {
+                    format!("Fabric 정보 조회 실패 ({e:#}) — 인터넷 연결 후 다시 실행")
+                })?
             }
         };
 
@@ -133,13 +136,11 @@ pub async fn prepare_and_launch(
         .join("versions")
         .join(&version_json.id)
         .join(format!("{}.jar", version_json.id));
-    download_file(
-        &client,
-        &version_json.downloads.client.url,
-        &client_jar,
-        Some(&version_json.downloads.client.sha1),
-    )
-    .await?;
+    let client_dl = version_json
+        .downloads
+        .get(&DownloadType::Client)
+        .with_context(|| format!("client 다운로드 정보 없음: {}", version_json.id))?;
+    download_file(&client, &client_dl.url, &client_jar, Some(&client_dl.sha1)).await?;
 
     // 4. libraries 다운로드 (rules 필터링)
     let all_libs: Vec<Library> = version_json
@@ -156,6 +157,9 @@ pub async fn prepare_and_launch(
     }
 
     for (i, lib) in all_libs.iter().enumerate() {
+        if !arch_classifier_ok(&lib.name) {
+            continue;
+        }
         if !library_allowed(lib) {
             continue;
         }
@@ -166,16 +170,25 @@ pub async fn prepare_and_launch(
         });
 
         if let Some(dl) = &lib.downloads {
-            // 일반 artifact
+            // 일반 artifact (path가 비어있으면 maven 좌표로 대체)
             if let Some(artifact) = &dl.artifact {
-                let path = root.join("libraries").join(&artifact.path);
+                let path = match artifact.path.as_deref().filter(|p| !p.is_empty()) {
+                    Some(p) => root.join("libraries").join(p),
+                    None => match maven_to_path(root, &lib.name) {
+                        Some(p) => p,
+                        None => continue,
+                    },
+                };
                 // classifiers 중 natives가 있으면 해당 OS 것만
                 if let Some(classifiers) = &dl.classifiers {
                     if let Some(native_key) = native_classifier_key() {
                         if let Some(native) = classifiers.get(native_key) {
-                            let npath = root.join("libraries").join(&native.path);
-                            download_file(&client, &native.url, &npath, Some(&native.sha1)).await?;
-                            extract_natives(&npath, &natives_dir(root, &version_json.id))?;
+                            if let Some(rel) = native.path.as_deref() {
+                                let npath = root.join("libraries").join(rel);
+                                download_file(&client, &native.url, &npath, Some(&native.sha1))
+                                    .await?;
+                                extract_natives(&npath, &natives_dir(root, &version_json.id))?;
+                            }
                         }
                     }
                 }
@@ -185,9 +198,11 @@ pub async fn prepare_and_launch(
                 // artifact 없이 classifier만 있는 경우 (구 natives)
                 if let Some(native_key) = native_classifier_key() {
                     if let Some(native) = classifiers.get(native_key) {
-                        let npath = root.join("libraries").join(&native.path);
-                        download_file(&client, &native.url, &npath, Some(&native.sha1)).await?;
-                        extract_natives(&npath, &natives_dir(root, &version_json.id))?;
+                        if let Some(rel) = native.path.as_deref() {
+                            let npath = root.join("libraries").join(rel);
+                            download_file(&client, &native.url, &npath, Some(&native.sha1)).await?;
+                            extract_natives(&npath, &natives_dir(root, &version_json.id))?;
+                        }
                     }
                 }
             }
@@ -216,10 +231,22 @@ pub async fn prepare_and_launch(
     // 5. assets 다운로드 (assetIndex + objects — 최소: index json만, objects는 lazy)
     download_assets(&client, root, &version_json).await?;
 
-    // 6. java args 구성
+    // 6. java 선택 (Modrinth App식 managed-first: 요구치 미달이면 자동 설치)
+    let required_java = version_json
+        .java_version
+        .as_ref()
+        .map(|j| j.major_version)
+        .unwrap_or(8);
+    on_progress(LaunchProgress {
+        step: "Java 확인 중...".into(),
+        done: 0,
+        total: 1,
+    });
+    let resolved =
+        crate::minecraft::java::resolve_java_for_launch(&client, config, required_java).await?;
     // Windows에서는 콘솔 창이 뜨지 않는 javaw.exe를 우선 사용
     let java = {
-        let j = config.effective_java();
+        let j = resolved;
         if cfg!(windows) {
             let w = j
                 .strip_suffix("java.exe")
@@ -407,16 +434,6 @@ fn natives_dir(root: &Path, version_id: &str) -> PathBuf {
     root.join("versions").join(version_id).join("natives")
 }
 
-fn current_os() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "windows"
-    } else if cfg!(target_os = "macos") {
-        "osx"
-    } else {
-        "linux"
-    }
-}
-
 fn library_allowed(lib: &Library) -> bool {
     let Some(rules) = &lib.rules else {
         return true;
@@ -428,24 +445,94 @@ fn library_allowed(lib: &Library) -> bool {
             None => true,
             Some(os) => match &os.name {
                 None => true,
-                Some(n) => n == current_os(),
+                // arm64 변형도 기본 OS로 묶어서 매칭 (최종 판정은 arch_classifier_ok)
+                Some(n) => os_matches(n),
             },
         };
         if os_match {
-            allowed = rule.action == "allow";
+            allowed = matches!(rule.action, RuleAction::Allow);
         }
     }
     allowed
 }
 
+/// daedalus Os enum → 현재 OS 매칭
+fn os_matches(name: &Os) -> bool {
+    let os = std::env::consts::OS;
+    let s = match name {
+        Os::Windows | Os::WindowsArm64 => "windows",
+        Os::Osx | Os::OsxArm64 => "osx",
+        Os::Linux | Os::LinuxArm64 | Os::LinuxArm32 => "linux",
+        Os::Unknown => return false,
+    };
+    s == os
+}
+
+/// maven 좌표의 classifier 접미사로 아키텍처를 가려낸다.
+/// (natives-windows-arm64/x86 등이 전부 os=windows 규칙이라 rules만으로 부족)
+fn arch_classifier_ok(name: &str) -> bool {
+    let Some((_, suffix)) = name.rsplit_once(":natives-") else {
+        return true;
+    };
+    let current = match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("windows", "aarch64") => "windows-arm64",
+        ("windows", _) => "windows",
+        ("macos", "aarch64") => "macos-arm64",
+        ("macos", _) => "macos",
+        ("linux", "aarch64") => "linux-arm64",
+        _ => "linux",
+    };
+    suffix == current
+}
+
+#[cfg(test)]
+mod classifier_tests {
+    use super::*;
+
+    #[test]
+    fn arch_classifier_filters_wrong_arch() {
+        // 일반 라이브러리는 항상 통과
+        assert!(arch_classifier_ok("net.fabricmc:fabric-loader:0.16.9"));
+        assert!(arch_classifier_ok("org.lwjgl:lwjgl:3.3.1"));
+        // 현재 플랫폼과 같은 접미사만 통과 (테스트 러너 기준)
+        let (os, arch) = (std::env::consts::OS, std::env::consts::ARCH);
+        let current = match (os, arch) {
+            ("windows", "aarch64") => "windows-arm64",
+            ("windows", _) => "windows",
+            ("macos", "aarch64") => "macos-arm64",
+            ("macos", _) => "macos",
+            ("linux", "aarch64") => "linux-arm64",
+            _ => "linux",
+        };
+        assert!(arch_classifier_ok(&format!(
+            "org.lwjgl:lwjgl:3.3.1:natives-{current}"
+        )));
+        // 다른 아키텍처는 탈락
+        let other = if current == "windows" {
+            "windows-arm64"
+        } else {
+            "windows"
+        };
+        assert!(!arch_classifier_ok(&format!(
+            "org.lwjgl:lwjgl:3.3.1:natives-{other}"
+        )));
+    }
+}
+
 fn native_classifier_key() -> Option<&'static str> {
-    if cfg!(target_os = "windows") {
-        Some("natives-windows")
-    } else if cfg!(target_os = "macos") {
-        // arm64/x64 구분은 phase 2 (현재 x86_64 기본)
-        Some("natives-macos")
-    } else {
-        Some("natives-linux")
+    let arm64 = std::env::consts::ARCH == "aarch64";
+    match std::env::consts::OS {
+        "windows" => Some(if arm64 {
+            "natives-windows-arm64"
+        } else {
+            "natives-windows"
+        }),
+        "macos" => Some(if arm64 {
+            "natives-macos-arm64"
+        } else {
+            "natives-macos"
+        }),
+        _ => Some("natives-linux"),
     }
 }
 
@@ -544,11 +631,13 @@ fn maven_to_path(root: &Path, coords: &str) -> Option<PathBuf> {
         return None;
     }
     let (group, artifact, version) = (parts[0], parts[1], parts[2]);
-    let group_path = group.replace('.', "/");
+    // group의 '.'을 OS 경로 구분자로 나눠 join (혼합 구분자 방지)
+    let mut p = root.join("libraries");
+    for g in group.split('.') {
+        p = p.join(g);
+    }
     Some(
-        root.join("libraries")
-            .join(group_path)
-            .join(artifact)
+        p.join(artifact)
             .join(version)
             .join(format!("{artifact}-{version}.jar")),
     )
@@ -675,6 +764,10 @@ fn launcher_meta_to_libraries(v: &serde_json::Value) -> Option<Vec<Library>> {
                 rules: None,
                 natives: None,
                 extract: None,
+                url: None,
+                checksums: None,
+                include_in_classpath: true,
+                downloadable: true,
             });
         }
     }
@@ -684,7 +777,7 @@ fn launcher_meta_to_libraries(v: &serde_json::Value) -> Option<Vec<Library>> {
 async fn download_assets(
     client: &reqwest::Client,
     root: &Path,
-    version: &VersionJson,
+    version: &VersionInfo,
 ) -> Result<()> {
     let indexes_dir = root.join("assets").join("indexes");
     std::fs::create_dir_all(&indexes_dir)?;

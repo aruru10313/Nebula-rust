@@ -106,3 +106,8 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 - [x] 커스텀 타이틀바, 게임 로그 캡처
 - [ ] MS 정품 로그인 복구 (API 심사 승인 후)
 - [ ] 크래시 리포트 고도화
+
+## 크레딧
+
+- Minecraft 메타데이터 모델은 Modrinth의 [`daedalus`](https://github.com/modrinth/daedalus) 크레이트(MIT)를 그대로 의존성으로 사용합니다.
+- 실행 파이프라인(재시도·캐시 폴백·관리 Java)의 설계도 [Modrinth App](https://github.com/modrinth/code)의 방식을 참조했습니다. 해당 부분의 코드는 Nebulya가 독자적으로 작성했으며, Modrinth의 GPL 코드·브랜딩을 포함하지 않습니다.

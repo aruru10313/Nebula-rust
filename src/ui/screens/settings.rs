@@ -164,5 +164,11 @@ fn advanced_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
                 let _ = open::that(&app.config.game_root);
             }
         });
+        ui.add_space(2.0);
+        ui.label(
+            egui::RichText::new("메타데이터: daedalus (Modrinth, MIT) · 실행부는 설계만 참조")
+                .color(theme::TEXT_FAINT)
+                .size(11.0),
+        );
     });
 }

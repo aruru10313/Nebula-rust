@@ -69,6 +69,53 @@ pub fn java_major_ok(java: &str, min_major: u32) -> bool {
         .unwrap_or(false)
 }
 
+/// 실행용 Java 선택 (Modrinth App식 managed-first):
+/// 1. 사용자가 지정한 경로가 요구치 만족 → 그대로
+/// 2. 관리 런타임(java-21)이 요구치 만족 → 사용
+/// 3. 시스템 Java가 요구치 만족 → 사용
+/// 4. 요구치가 16+ → Adoptium JRE 21 자동 설치
+/// 5. 구버전(8 이하)인데 쓸 Java가 없음 → 명확한 에러
+pub async fn resolve_java_for_launch(
+    client: &reqwest::Client,
+    config: &crate::core::LauncherConfig,
+    required_major: u32,
+) -> anyhow::Result<String> {
+    let want = if required_major == 0 {
+        8
+    } else {
+        required_major
+    };
+
+    // 구버전(Java 8 계열): 관리 런타임(21)은 오히려 실행 불가 — 시스템 Java 우선
+    if want <= 8 {
+        if !config.java_path.trim().is_empty() {
+            return Ok(config.java_path.clone());
+        }
+        if let Some(sys) = find_java() {
+            return Ok(sys);
+        }
+        anyhow::bail!("Java 8이 필요하지만 찾지 못했습니다 — 설정에서 Java 경로를 지정하세요");
+    }
+
+    if !config.java_path.trim().is_empty() {
+        if java_major_ok(&config.java_path, want) {
+            return Ok(config.java_path.clone());
+        }
+        tracing::warn!("지정 Java가 요구치(Java {want}+) 미달 — 자동 선택으로 전환");
+    }
+    let managed = managed_java_exe(&config.game_root);
+    if managed.exists() && java_major_ok(&managed.to_string_lossy(), want) {
+        return Ok(managed.to_string_lossy().to_string());
+    }
+    if let Some(sys) = find_java() {
+        if java_major_ok(&sys, want) {
+            return Ok(sys);
+        }
+    }
+    tracing::info!("Java {want}+ 필요 — 관리 JRE 21 설치");
+    ensure_java_21(client, &config.game_root).await
+}
+
 // ---- Adoptium JRE 자동 설치 (Theseus식 관리 런타임) ----
 
 /// 관리 런타임 위치: <game_root>/runtime/java-21
@@ -109,7 +156,11 @@ pub async fn ensure_java_21(
 ) -> anyhow::Result<String> {
     let dest = managed_runtime_dir(root);
     let java_exe = managed_java_exe(root);
-    if managed_marker(root).exists() && java_exe.exists() {
+    // 마커 + 실행 검증 통과 시에만 재사용 (깨진 잔재는 재설치)
+    if managed_marker(root).exists()
+        && java_exe.exists()
+        && java_major_ok(&java_exe.to_string_lossy(), 21)
+    {
         return Ok(java_exe.to_string_lossy().to_string());
     }
 
@@ -147,8 +198,11 @@ pub async fn ensure_java_21(
     if !java_exe.exists() {
         anyhow::bail!("설치 후에도 java 실행 파일을 찾지 못했습니다");
     }
-    // 설치 검증: 실행 + 버전 확인
+    // 설치 검증: 실행 + 버전 확인 (통과 못 하면 마커 없이 실패)
     let ver = java_version(&java_exe.to_string_lossy()).unwrap_or_default();
+    if !java_major_ok(&java_exe.to_string_lossy(), 21) {
+        anyhow::bail!("관리 JRE 검증 실패 (실행 불가: {ver})");
+    }
     tracing::info!("관리 JRE 설치됨: {ver}");
     std::fs::write(managed_marker(root), "21")
         .map_err(|e| anyhow::anyhow!("마커 기록 실패: {e}"))?;
@@ -213,7 +267,8 @@ fn extract_tar_gz_safe(bytes: &[u8], dest: &std::path::Path) -> anyhow::Result<(
     Ok(())
 }
 
-/// dest直下가 단일 폴더면 그 안의 bin을 dest/bin으로 이동 (중첩 승격)
+/// dest直下가 단일 폴더면 그 안의 내용 전체를 dest로 승격
+/// (bin만 올리면 lib/conf가 빠져 java가 실행 불가 — 반드시 통째로 이동)
 fn promote_nested_bin(dest: &std::path::Path) -> anyhow::Result<()> {
     let exe = if cfg!(windows) { "java.exe" } else { "java" };
     if dest.join("bin").join(exe).exists() {
@@ -227,12 +282,19 @@ fn promote_nested_bin(dest: &std::path::Path) -> anyhow::Result<()> {
         }
     }
     if dirs.len() == 1 {
-        let nested_bin = dirs[0].join("bin");
-        if nested_bin.join(exe).exists() {
-            // 기존 bin이 없으므로 rename으로 승격
-            std::fs::rename(&nested_bin, dest.join("bin"))
-                .map_err(|e| anyhow::anyhow!("bin 승격 실패: {e}"))?;
-            let _ = std::fs::remove_dir_all(&dirs[0]);
+        let nested = &dirs[0];
+        if nested.join("bin").join(exe).exists() {
+            for e in
+                std::fs::read_dir(nested).map_err(|e| anyhow::anyhow!("런타임 탐색 실패: {e}"))?
+            {
+                let e = e.map_err(|e| anyhow::anyhow!("런타임 탐색 실패: {e}"))?;
+                let target = dest.join(e.file_name());
+                if !target.exists() {
+                    std::fs::rename(e.path(), &target)
+                        .map_err(|e| anyhow::anyhow!("런타임 승격 실패: {e}"))?;
+                }
+            }
+            let _ = std::fs::remove_dir_all(nested);
             return Ok(());
         }
     }

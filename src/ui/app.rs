@@ -640,8 +640,7 @@ impl NebulyaApp {
             let versions: Vec<String> =
                 match rt.block_on(crate::minecraft::version::fetch_manifest(&http)) {
                     Ok(m) => {
-                        let mut v: Vec<String> = m
-                            .releases()
+                        let mut v: Vec<String> = crate::minecraft::version::releases(&m)
                             .into_iter()
                             .take(30)
                             .map(|e| e.id.clone())

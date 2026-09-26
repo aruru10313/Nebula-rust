@@ -86,12 +86,20 @@ impl LauncherConfig {
 
     pub fn load() -> Self {
         let path = Self::config_path();
-        if let Ok(bytes) = std::fs::read(&path) {
-            if let Ok(cfg) = serde_json::from_slice::<Self>(&bytes) {
-                return cfg;
-            }
+        match std::fs::read(&path) {
+            Ok(bytes) => match serde_json::from_slice::<Self>(&bytes) {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    // 파싱 실패 시 덮어쓰기 전에 백업 (계정 정보 보호)
+                    tracing::warn!("config 파싱 실패, 백업 후 기본값 사용: {e}");
+                    let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+                    let bak = path.with_extension(format!("json.bak-{stamp}"));
+                    let _ = std::fs::rename(&path, &bak);
+                    Self::default()
+                }
+            },
+            Err(_) => Self::default(),
         }
-        Self::default()
     }
 
     pub fn save(&self) -> Result<()> {

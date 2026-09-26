@@ -510,3 +510,19 @@ pub fn paint_backdrop(ctx: &egui::Context, rect: egui::Rect) {
         }
     }
 }
+
+/// 상태 문구 색상: 실패 계열은 레드, 완료 계열은 그린, 나머지는 dim
+pub fn status_color(msg: &str) -> Color32 {
+    if msg.contains("실패") || msg.contains("오류") || msg.contains("거부") {
+        DANGER
+    } else if msg.contains("완료")
+        || msg.contains("성공")
+        || msg.contains("갱신됨")
+        || msg.contains("저장됨")
+        || msg.contains("발송")
+    {
+        SUCCESS
+    } else {
+        TEXT_DIM
+    }
+}

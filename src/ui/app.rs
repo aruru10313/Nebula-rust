@@ -1185,21 +1185,30 @@ impl eframe::App for NebulyaApp {
                 });
             });
 
-        // 중앙 컨텐츠 — 창이 낮아도 잘리지 않게 전체 스크롤
+        // 중앙 컨텐츠 — 창이 낮아도 잘리지 않게 전체 스크롤.
+        // 와이드 창에서는 최대폭으로 묶어 좌우 여백을 둔다 (카드가 끝없이 늘어나지 않게).
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
-                    // 가로 폭은 그대로 쓰고 세로만 스크롤
-                    ui.set_width(ui.available_width());
-                    match self.tab {
-                        Tab::Home => crate::ui::screens::home::show(self, ui),
-                        Tab::Instances => crate::ui::screens::instances::show(self, ui),
-                        Tab::Mods => crate::ui::screens::mods::show(self, ui),
-                        Tab::Account => crate::ui::screens::account::show(self, ui),
-                        Tab::Settings => crate::ui::screens::settings::show(self, ui),
-                    }
-                    ui.add_space(16.0);
+                    let avail = ui.available_width();
+                    let content_w = avail.min(920.0);
+                    let pad = ((avail - content_w) / 2.0).max(0.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space(pad);
+                        ui.vertical(|ui| {
+                            ui.set_min_width(content_w);
+                            match self.tab {
+                                Tab::Home => crate::ui::screens::home::show(self, ui),
+                                Tab::Instances => crate::ui::screens::instances::show(self, ui),
+                                Tab::Mods => crate::ui::screens::mods::show(self, ui),
+                                Tab::Account => crate::ui::screens::account::show(self, ui),
+                                Tab::Settings => crate::ui::screens::settings::show(self, ui),
+                            }
+                            ui.add_space(16.0);
+                        });
+                        ui.add_space(pad);
+                    });
                 });
         });
 

@@ -185,11 +185,19 @@ fn nebula_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
             } else if theme::accent_button(ui, "Nebulya 로그인").clicked() {
                 app.nebula_login();
             }
+            if !app.nebula_mode_signup {
+                ui.label(
+                    egui::RichText::new("계정이 없으면 상단 가입하기 탭에서 만드세요")
+                        .color(theme::TEXT_FAINT)
+                        .size(11.0),
+                );
+            }
         }
         if !app.nebula_status.is_empty() {
+            ui.add_space(2.0);
             ui.label(
                 egui::RichText::new(&app.nebula_status)
-                    .color(theme::TEXT_DIM)
+                    .color(theme::status_color(&app.nebula_status))
                     .size(12.0),
             );
         }

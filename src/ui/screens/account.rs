@@ -1,4 +1,3 @@
-use crate::minecraft::auth::LoginState;
 use crate::ui::theme;
 use crate::ui::NebulyaApp;
 
@@ -10,7 +9,18 @@ pub fn show(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::section_header(ui, "👤", "계정", "Nebulya 로그인");
     ui.add_space(8.0);
 
-    // MS 로그인은 심사 승인 후 복구 예정이라 당분간 Nebulya 계정만 노출
+    // MS 로그인은 심사 승인 후 복구 예정이라 당분간 Nebulya 계정만 노출.
+    // 단, 기존 MS 계정이 있으면 관리(갱신/로그아웃) UI를 보여준다.
+    if app.config.account.is_some() {
+        theme::card_frame().show(ui, |ui| {
+            theme::section_header(ui, "★", "Microsoft 계정", "정품");
+            if let Some(acc) = app.config.account.clone() {
+                account_info(app, ui, &acc);
+            }
+        });
+        ui.add_space(8.0);
+    }
+
     nebula_card(app, ui);
 
     ui.add_space(8.0);
@@ -84,71 +94,6 @@ fn account_info(
             app.status = "로그아웃됨".to_string();
         }
     });
-}
-
-fn login_flow(app: &mut NebulyaApp, ui: &mut egui::Ui) {
-    ui.label(
-        egui::RichText::new("정품 로그인하면 모든 정품 서버에 접속할 수 있습니다.")
-            .color(theme::TEXT_DIM)
-            .size(12.0),
-    );
-    ui.add_space(2.0);
-    let snapshot = app
-        .login_state
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .clone();
-    match snapshot {
-        LoginState::Idle => {
-            if theme::accent_button(ui, "★ Microsoft 로그인").clicked() {
-                app.start_ms_login();
-            }
-        }
-        LoginState::Code { user_code, uri } => {
-            theme::tile_frame().show(ui, |ui| {
-                ui.label(egui::RichText::new("브라우저에서 아래 코드를 입력하세요").strong());
-                let mut code = user_code.clone();
-                ui.add(
-                    egui::TextEdit::singleline(&mut code)
-                        .desired_width(220.0)
-                        .font(egui::TextStyle::Heading)
-                        .horizontal_align(egui::Align::Center),
-                );
-                let left = *app
-                    .login_wait_secs
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner());
-                if left > 0 {
-                    ui.label(
-                        egui::RichText::new(format!("남은 시간: {left}초"))
-                            .color(theme::TEXT_DIM)
-                            .size(12.0),
-                    );
-                }
-                ui.monospace(&uri);
-                ui.horizontal(|ui| {
-                    if theme::accent_button(ui, "브라우저 열기").clicked() {
-                        let _ = open::that(&uri);
-                    }
-                    if theme::ghost_button(ui, "취소").clicked() {
-                        app.cancel_ms_login();
-                    }
-                });
-            });
-        }
-        LoginState::Working(msg) => {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label(msg);
-            });
-            if theme::ghost_button(ui, "취소").clicked() {
-                app.cancel_ms_login();
-            }
-        }
-        LoginState::Done(_) | LoginState::Failed(_) => {
-            ui.spinner();
-        }
-    }
 }
 
 /// Nebulya 자체 계정 (서버 세션 방식). MS 로그인과 별개로 사용한다.

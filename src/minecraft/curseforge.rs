@@ -166,7 +166,10 @@ pub async fn install_latest(
         .iter()
         .find(|f| f.download_url.is_some())
         .context("해당 MC버전+Fabric 호환 파일이 없음")?;
-    let url = f.download_url.clone().unwrap();
+    let url = f
+        .download_url
+        .clone()
+        .context("선택된 파일에 다운로드 URL이 없음")?;
     std::fs::create_dir_all(mods_dir)?;
     let dest = super::mods::safe_join(mods_dir, &f.file_name)?;
     super::mods::download_url_to(client, &url, &dest).await?;

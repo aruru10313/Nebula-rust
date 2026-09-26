@@ -5,13 +5,14 @@
 
 ## 로그인
 
-- [ ] 공식 Minecraft Launcher와 같은 Microsoft 브라우저 로그인 UX 적용
-- [ ] Azure Portal을 사용자가 방문하지 않도록 배포 빌드에 public client ID 주입
-- [ ] OAuth Authorization Code + PKCE 및 `state` 검증 적용
-- [ ] 비밀번호, device code, access token, refresh token을 로그에 출력하지 않기
-- [ ] refresh token을 OS 자격 증명 저장소에 보관
-- [ ] Minecraft 소유권 및 프로필 조회 후에만 게임 실행 허용
-- [ ] 로그아웃 시 저장된 자격 증명과 세션 삭제
+- [x] Microsoft Device Code 로그인 (브라우저 코드 입력 방식)
+- [x] 배포 빌드에 public client ID 내장 (사용자 Azure 작업 없음)
+- [x] access token 로그 마스킹
+- [x] 정품 세션 갱신 실패 시 실행 중단 (오프라인 폴백 없음)
+- [x] 로그아웃 시 로컬 계정 삭제
+- [ ] OAuth Authorization Code + PKCE 전환 (향후)
+- [ ] refresh token OS 자격 증명 저장소 보관 (현재 config.json 평문)
+- [ ] entitlements 명시 확인 + 서버 측 토큰 revoke
 
 > Microsoft 인증을 사용하려면 런처 배포자에만 한 번 앱 등록(public client)이
 > 필요합니다. client ID는 비밀 값이 아니지만 GitHub secret으로 취급하지 않고
@@ -35,8 +36,8 @@
 - [x] `cargo fmt --check`
 - [x] `cargo check --locked --all-targets`
 - [x] `cargo test --locked`
-- [ ] GitHub Actions의 Windows/macOS/Linux 빌드 성공
-- [ ] 설치 파일에 실행 권한 및 메타데이터가 올바른지 확인
+- [x] GitHub Actions의 Windows/macOS/Linux 빌드 성공 (v7.4.0 릴리스)
+- [x] 설치 파일에 실행 권한 및 메타데이터 포함 (ISS + deb assets + tar)
 - [x] 태그와 `Cargo.toml` 버전이 일치하는지 확인
 - [ ] 공개 배포 전 Windows 코드 서명 인증서 준비
 
@@ -44,7 +45,7 @@
 
 - [x] `Cargo.lock` 생성 및 추적 시작
 - [x] 로컬 저장소를 원격 브랜치에 연결
-- [ ] 인증 코드 보안 개선
+- [x] 인증 코드 보안 개선 (토큰 마스킹, 실패 시 중단, 파일명 검증)
 - [x] 보안 CI/release workflow 코드 작성
-- [ ] GitHub Actions 실행 성공 확인
-- [ ] GitHub Release 자동화 검증
+- [x] GitHub Actions 실행 성공 확인 (v7.4.0)
+- [x] GitHub Release 자동화 검증 (v7.4.0 파일 7종 공개됨)

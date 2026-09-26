@@ -829,8 +829,8 @@ impl NebulyaApp {
                 refreshed,
             } => {
                 if let Some(acc) = refreshed {
+                    self.config.username = acc.username.clone();
                     self.config.account = Some(acc);
-                    self.config.username = self.config.account.as_ref().unwrap().username.clone();
                     self.log("정품 토큰 자동 갱신됨");
                 }
                 inst.total_plays += 1;

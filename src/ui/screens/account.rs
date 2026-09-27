@@ -98,6 +98,14 @@ fn account_info(
 
 /// Nebulya 자체 계정 (서버 세션 방식). MS 로그인과 별개로 사용한다.
 fn nebula_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
+    ui.vertical_centered(|ui| {
+        ui.set_max_width(520.0);
+        nebula_card_inner(app, ui);
+    });
+}
+
+/// Nebulya 자체 계정 (서버 세션 방식). MS 로그인과 별개로 사용한다.
+fn nebula_card_inner(app: &mut NebulyaApp, ui: &mut egui::Ui) {
     theme::card_frame().show(ui, |ui| {
         theme::section_header(ui, "★", "Nebulya 계정", "런처 자체 로그인");
         if let Some(acc) = app.config.nebula_account.clone() {

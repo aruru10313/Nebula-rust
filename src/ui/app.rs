@@ -88,7 +88,8 @@ impl NebulyaApp {
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
 
-        let discord = DiscordPresence::new(config.discord_enabled, &config.discord_client_id);
+        let discord =
+            DiscordPresence::new(config.discord_enabled, &config.discord_client_id_resolved());
 
         let mut app = Self {
             config,
@@ -155,8 +156,10 @@ impl NebulyaApp {
 
     /// 설정 변경 후 Discord 재연결 (설정 화면 저장 시 호출)
     pub fn sync_discord(&mut self) {
-        self.discord
-            .reconfigure(self.config.discord_enabled, &self.config.discord_client_id);
+        self.discord.reconfigure(
+            self.config.discord_enabled,
+            &self.config.discord_client_id_resolved(),
+        );
         let user = self.config.username.clone();
         self.discord.show_home(&user);
     }

@@ -107,14 +107,14 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         ui.add_space(4.0);
         form_row(ui, "Discord 상태", |ui| {
             ui.checkbox(&mut app.config.discord_enabled, "표시");
-            let (dot, txt) =
-                if !app.config.discord_enabled || app.config.discord_client_id.trim().is_empty() {
-                    ("○", "꺼짐")
-                } else if app.discord.is_connected() {
-                    ("●", "활동 표시 중")
-                } else {
-                    ("●", "연결 대기 중")
-                };
+            let resolved = app.config.discord_client_id_resolved();
+            let (dot, txt) = if !app.config.discord_enabled || resolved.trim().is_empty() {
+                ("○", "꺼짐")
+            } else if app.discord.is_connected() {
+                ("●", "활동 표시 중")
+            } else {
+                ("●", "연결 대기 중")
+            };
             theme::badge(
                 ui,
                 &format!("{dot} {txt}"),
@@ -131,6 +131,14 @@ fn link_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         });
         form_row(ui, "Discord App ID", |ui| {
             ui.text_edit_singleline(&mut app.config.discord_client_id);
+        });
+        ui.horizontal(|ui| {
+            ui.add_space(130.0);
+            ui.label(
+                egui::RichText::new("비우면 내장 기본값 사용 (기본값이 비어있으면 꺼짐)")
+                    .color(theme::TEXT_FAINT)
+                    .size(11.0),
+            );
         });
     });
 }

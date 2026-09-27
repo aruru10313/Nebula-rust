@@ -32,7 +32,7 @@ pub struct LauncherConfig {
     /// Discord Activity 표시 여부
     #[serde(default = "default_true")]
     pub discord_enabled: bool,
-    /// Discord Developers Application ID (비어있으면 Activity 비활성화)
+    /// Discord Developers Application ID (비어있으면 내장 기본값 사용)
     #[serde(default)]
     pub discord_client_id: String,
     /// Microsoft Client ID (Azure 앱 등록, 정품 로그인용)
@@ -54,6 +54,11 @@ pub struct LauncherConfig {
 /// Client ID는 OAuth URL에 그대로 노출되는 공개 값이므로 코드에 포함해도 된다.
 /// 사용자가 설정/환경변수로 덮어쓸 수 있다.
 pub const DEFAULT_MS_CLIENT_ID: &str = "e36da7c2-0cfc-45a6-9ba2-718fece7c46d";
+
+/// 내장 Discord Application ID (설정에서 비우면 이 값 사용).
+/// Discord 개발자 포털에서 Nebulya용 앱을 만들고 ID를 여기에 넣으면
+/// 사용자가 아무것도 입력하지 않아도 Activity가 자동 표시된다.
+pub const DEFAULT_DISCORD_CLIENT_ID: &str = "";
 
 fn default_true() -> bool {
     true
@@ -125,6 +130,14 @@ impl LauncherConfig {
             return self.curseforge_api_key.clone();
         }
         std::env::var("NEBULYA_CF_API_KEY").unwrap_or_default()
+    }
+
+    /// Discord App ID (설정값 → 내장 기본값 순, 둘 다 비면 비활성화)
+    pub fn discord_client_id_resolved(&self) -> String {
+        if !self.discord_client_id.trim().is_empty() {
+            return self.discord_client_id.clone();
+        }
+        DEFAULT_DISCORD_CLIENT_ID.to_string()
     }
 
     /// MS Client ID (설정값 → 환경변수 → 내장 기본값 순)

@@ -739,10 +739,16 @@ impl NebulyaApp {
         }
     }
 
-    /// 플레이 버튼 (정품 전용: 계정 없으면 실행 불가)
+    /// 플레이 버튼 (로그인 필수: 계정이 없으면 계정 탭으로 안내)
     /// 준비·다운로드·실행 전체를 백그라운드 스레드로 돌려 UI가 얼지 않는다.
     pub fn launch(&mut self) {
         if self.launching {
+            return;
+        }
+        // 로그인이 먼저: 계정이 없으면 바로 실행하지 않고 계정 탭으로 보낸다
+        if self.config.account.is_none() && self.config.nebula_account.is_none() {
+            self.tab = Tab::Account;
+            self.status = "먼저 계정 탭에서 로그인하세요".to_string();
             return;
         }
         // 로그인은 필요한 사람만: 계정이 없어도 게스트 오프라인으로 실행

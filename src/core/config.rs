@@ -16,6 +16,9 @@ pub struct LauncherConfig {
     /// 게임 해상도
     pub width: u32,
     pub height: u32,
+    /// 전체화면으로 시작 (끄면 창모드 — Alt+Tab 전환이 편함)
+    #[serde(default)]
+    pub fullscreen: bool,
     /// 선택된 인스턴스 id
     pub selected_instance: Option<String>,
     /// 게임 디렉토리 루트
@@ -65,6 +68,7 @@ impl Default for LauncherConfig {
             java_path: String::new(),
             width: 854,
             height: 480,
+            fullscreen: false,
             selected_instance: None,
             game_root: default_game_root(),
             hide_on_launch: false,

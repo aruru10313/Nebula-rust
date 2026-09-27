@@ -228,8 +228,8 @@ pub async fn prepare_and_launch(
         }
     }
 
-    // 5. assets 다운로드 (assetIndex + objects — 최소: index json만, objects는 lazy)
-    download_assets(&client, root, &version_json).await?;
+    // 5. assets 다운로드 (인덱스 + objects 전체)
+    download_assets(&client, root, &version_json, &on_progress).await?;
 
     // 6. java 선택 (Modrinth App식 managed-first: 요구치 미달이면 자동 설치)
     let required_java = version_json
@@ -305,6 +305,10 @@ pub async fn prepare_and_launch(
         "--height".to_string(),
         config.height.to_string(),
     ];
+    // 전체화면 시작 (기본 창모드 — 배타 전체화면은 Alt+Tab을 막는다)
+    if config.fullscreen {
+        args.push("--fullscreen".to_string());
+    }
 
     // 구버전(1.13 미만 minecraftArguments 방식)은 phase 2에서 별도 처리
     let _ = &mut args;
@@ -516,6 +520,31 @@ mod classifier_tests {
         assert!(!arch_classifier_ok(&format!(
             "org.lwjgl:lwjgl:3.3.1:natives-{other}"
         )));
+    }
+}
+
+#[cfg(test)]
+mod asset_index_tests {
+    /// 실제 Mojang 에셋 인덱스로 daedalus AssetsIndex 파싱 검증 (온라인 필요)
+    #[tokio::test]
+    async fn parses_live_asset_index() {
+        let client = reqwest::Client::new();
+        let index: crate::minecraft::version::AssetsIndex =
+            crate::minecraft::net::get_json(
+                &client,
+                "https://piston-meta.mojang.com/v1/packages/e1e23f09e9f518f5b8f76dac10524ebf07691d86/5.json",
+                "테스트 에셋 인덱스",
+            )
+            .await
+            .expect("에셋 인덱스 조회 실패");
+        assert!(
+            index.objects.len() > 1000,
+            "objects too few: {}",
+            index.objects.len()
+        );
+        let (_, a) = index.objects.iter().next().unwrap();
+        assert_eq!(a.hash.len(), 40);
+        assert!(a.size > 0);
     }
 }
 
@@ -778,6 +807,7 @@ async fn download_assets(
     client: &reqwest::Client,
     root: &Path,
     version: &VersionInfo,
+    on_progress: &(impl Fn(LaunchProgress) + Send + Sync),
 ) -> Result<()> {
     let indexes_dir = root.join("assets").join("indexes");
     std::fs::create_dir_all(&indexes_dir)?;
@@ -789,8 +819,63 @@ async fn download_assets(
         Some(&version.asset_index.sha1),
     )
     .await?;
-    // objects는 용량이 크므로 phase 1에서는 index만 받고,
-    // 실제 objects 다운로드는 게임 실행 시 바닐라가 자동 복구하거나 phase 2에서 전체 미러링.
-    // 최소 부팅용으로 index 존재만 보장.
+    // objects 전체 미러링 (없으면 아이콘·리소스팩·사운드 깨짐).
+    // daedalus AssetsIndex를 그대로 사용. 이미 받은 파일은 해시 검증 후 건너뜀.
+    let bytes = std::fs::read(&index_path)?;
+    let index: crate::minecraft::version::AssetsIndex =
+        serde_json::from_slice(&bytes).context("에셋 인덱스 파싱 실패")?;
+    let objects_dir = root.join("assets").join("objects");
+    let pending: Vec<(PathBuf, String)> = index
+        .objects
+        .iter()
+        .filter_map(|(_, a)| {
+            let dest = objects_dir.join(&a.hash[..2]).join(&a.hash);
+            let ok = dest.exists()
+                && std::fs::metadata(&dest)
+                    .map(|m| m.len() == a.size as u64)
+                    .unwrap_or(false);
+            if ok {
+                None
+            } else {
+                Some((dest, a.hash.clone()))
+            }
+        })
+        .collect();
+    let total = pending.len();
+    if total == 0 {
+        return Ok(());
+    }
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    let done = Arc::new(AtomicUsize::new(0));
+    // 8개씩 병렬 (요청 수천 개라 순차는 너무 느림)
+    for chunk in pending.chunks(64) {
+        let mut tasks = vec![];
+        for (dest, hash) in chunk {
+            let client = client.clone();
+            let dest = dest.clone();
+            let hash = hash.clone();
+            let done = done.clone();
+            tasks.push(tokio::spawn(async move {
+                let url = format!(
+                    "https://resources.download.minecraft.net/{}/{hash}",
+                    &hash[..2]
+                );
+                let r = download_file(&client, &url, &dest, Some(&hash).map(|s| s.as_str())).await;
+                done.fetch_add(1, Ordering::Relaxed);
+                r
+            }));
+        }
+        for t in tasks {
+            t.await
+                .map_err(|e| anyhow::anyhow!("에셋 다운로드 작업 실패: {e}"))??;
+        }
+        let d = done.load(Ordering::Relaxed);
+        on_progress(LaunchProgress {
+            step: format!("에셋 ({d}/{total})"),
+            done: d as u64,
+            total: total as u64,
+        });
+    }
     Ok(())
 }

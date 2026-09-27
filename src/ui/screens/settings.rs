@@ -84,6 +84,10 @@ fn game_card(app: &mut NebulyaApp, ui: &mut egui::Ui) {
         });
         ui.add_space(4.0);
         ui.checkbox(&mut app.config.hide_on_launch, "실행 시 런처 숨기기");
+        ui.checkbox(
+            &mut app.config.fullscreen,
+            "전체화면으로 시작 (끄면 창모드·Alt+Tab 편함)",
+        );
     });
 }
 

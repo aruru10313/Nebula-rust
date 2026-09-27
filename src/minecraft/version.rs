@@ -7,8 +7,8 @@
 
 use anyhow::Result;
 pub use daedalus::minecraft::{
-    DownloadType, Library, Os, RuleAction, Version, VersionInfo, VersionManifest, VersionType,
-    VERSION_MANIFEST_URL,
+    AssetsIndex, DownloadType, Library, Os, RuleAction, Version, VersionInfo, VersionManifest,
+    VersionType, VERSION_MANIFEST_URL,
 };
 
 /// release 버전만 필터 (런처 기본 목록용)
